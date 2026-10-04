@@ -147,6 +147,8 @@ table.cross { border-collapse: collapse; width: 100%; font-variant-numeric: tabu
 .status { font-size: 13.5px; color: var(--muted); line-height: 1.4; }
 .status b { color: var(--ink); font-weight: 600; }
 .status.warn { color: var(--accent); font-weight: 600; }
+.left { white-space: nowrap; }
+.left.urgent { color: var(--accent); font-weight: 600; }
 .game.pending { cursor: default; }
 .game.pending:hover { border-color: var(--line); }
 .game.pending .board { opacity: 0.45; filter: saturate(0.6); }
@@ -311,6 +313,36 @@ try { ({ Chess } = await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dis
     if (abs < 3600) return rtf.format(Math.round(s / 60), "minute");
     if (abs < 86400) return rtf.format(Math.round(s / 3600), "hour");
     return rtf.format(Math.round(s / 86400), "day");
+  }
+
+  // Correspondence: the player to move has daysPerTurn days from the last move
+  // (or the game's creation), as on Lichess. The export has no clock object.
+  const DAY_MS = 86400000;
+  function deadlineOf(g) {
+    if (g.result || !g.moves.length || !g.daysPerTurn) return null;
+    return g.lastMoveAt + g.daysPerTurn * DAY_MS;
+  }
+  // Rounded down, so it never shows more time than there is.
+  function fmtLeft(ms) {
+    if (ms <= 0) return "out of time";
+    const min = Math.floor(ms / 60000), h = Math.floor(min / 60), d = Math.floor(h / 24);
+    if (d) return `${d} day${d === 1 ? "" : "s"}${h % 24 ? ` ${h % 24} h` : ""} left`;
+    if (h) return `${h} h${min % 60 ? ` ${min % 60} min` : ""} left`;
+    return min ? `${min} min left` : "less than a minute left";
+  }
+  // Kept current by tickDeadlines() without re-rendering.
+  function leftHTML(g) {
+    const dl = deadlineOf(g);
+    if (dl == null) return "";
+    const ms = dl - Date.now();
+    return `<span class="left${ms < DAY_MS ? " urgent" : ""}" data-deadline="${dl}">${fmtLeft(ms)}</span>`;
+  }
+  function tickDeadlines() {
+    for (const el of document.querySelectorAll(".left[data-deadline]")) {
+      const ms = +el.dataset.deadline - Date.now();
+      el.textContent = fmtLeft(ms);
+      el.classList.toggle("urgent", ms < DAY_MS);
+    }
   }
 
   // ---------- config parsing ----------
@@ -695,7 +727,8 @@ try { ({ Chess } = await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dis
     }
     if (!g.moves.length) return `<b>Not started.</b> White to make the first move.`;
     const who = displayName(g.turn === "white" ? g.white : g.black);
-    return `<b>${esc(who)} to move</b>, move ${g.turn === "white" ? moveNo + 1 : moveNo}<br>Last move ${ago(g.lastMoveAt)}`;
+    const left = leftHTML(g);
+    return `<b>${esc(who)} to move</b>${left ? `, ${left}` : ""}<br>Move ${g.turn === "white" ? moveNo + 1 : moveNo}, last move ${ago(g.lastMoveAt)}`;
   }
 
   function renderGames() {
@@ -961,7 +994,8 @@ try { ({ Chess } = await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dis
       if (g.result === "void") { res = "—"; note = "Aborted, does not count"; }
       else if (score === null) {
         res = '<span class="live">● live</span>';
-        note = !g.moves.length ? "Not started" : `${esc(displayName(g.turn === color ? me : opp))} to move, last move ${ago(g.lastMoveAt)}`;
+        const left = leftHTML(g);
+        note = !g.moves.length ? "Not started" : `${esc(displayName(g.turn === color ? me : opp))} to move, ${left ? `${left}, ` : ""}last move ${ago(g.lastMoveAt)}`;
       } else {
         res = score === 1 ? "1" : score === 0 ? "0" : "½";
         note = `${REASONS[g.status] || "finished"}${g.opening ? ", " + esc(g.opening) : ""}`;
@@ -1134,7 +1168,10 @@ try { ({ Chess } = await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dis
     const secs = Math.max(20, (CONFIG && CONFIG.refreshSeconds) || 300);
     setTimeout(() => { if (!document.hidden) refresh(); loop(); }, secs * 1000);
   })();
-  setInterval(() => { if (state.lastUpdate && !busy && Date.now() >= state.pausedUntil) renderSync(); }, 15000);
+  setInterval(() => {
+    tickDeadlines();
+    if (state.lastUpdate && !busy && Date.now() >= state.pausedUntil) renderSync();
+  }, 15000);
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden && (!state.lastUpdate || Date.now() - state.lastUpdate > 30000)) refresh();
   });
