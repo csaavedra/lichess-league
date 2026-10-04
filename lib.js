@@ -162,9 +162,9 @@ export function playerStats(list, players, sc = DEFAULT_SCORING) {
     st.pts += pts;
     st[color].n++; st[color].pts += pts;
     if (score === 1) st.w++; else if (score === 0) st.l++; else st.d++;
-    // Seed ratings are each player's fixed tournament rating; many Lichess
-    // correspondence ratings here are provisional. Fall back to the Lichess
-    // rating at the start of the game for a player without one.
+    // Seed ratings are each player's fixed tournament rating; Lichess ratings
+    // change from game to game and can be provisional. Fall back to the
+    // Lichess rating at the start of the game for a player without one.
     const oppR = seedRatingOf(opp.id) ?? opp.rating;
     const meR = seedRatingOf(me.id) ?? me.rating;
     if (oppR != null) {

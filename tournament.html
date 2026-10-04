@@ -947,7 +947,7 @@ function renderPlayer() {
         <thead><tr><th>Round</th><th>Opponent</th><th class="r">Result</th><th class="num">Rating</th><th class="num">Moves</th><th>Notes</th></tr></thead>
         <tbody>${rowsHTML}</tbody></table></div>` : '<p class="facts">No games yet.</p>'}
     </div>
-    <p class="facts fine">Ratings next to names are Lichess correspondence ratings at the start of each game. Performance and expected score use the seed ratings, each player's fixed rating for the tournament, because many Lichess correspondence ratings here are still provisional. Performance is Lichess's tournament performance over finished games: the average of each opponent's rating, plus 500 for a win and minus 500 for a loss.${rated ? " Rating change adds up what Lichess awarded for the finished games in this tournament." : ""}</p>
+    <p class="facts fine">Ratings next to names are Lichess ratings at the start of each game. Performance and expected score use the seed ratings, each player's fixed rating for the tournament, because Lichess ratings change from game to game and can be provisional. Performance is Lichess's tournament performance over finished games: the average of each opponent's rating, plus 500 for a win and minus 500 for a loss.${rated ? " Rating change adds up what Lichess awarded for the finished games in this tournament." : ""}</p>
   </div>`;
 }
 
