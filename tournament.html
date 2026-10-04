@@ -9,8 +9,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Spectral:wght@500;600;700&display=swap" rel="stylesheet">
 
 <!--
-  The players, rounds and games live in tournament.json next to this file.
-  Edit that file to update the tournament; the page re-reads it on every refresh.
+  The players, rounds and games live in tournament.json next to this file. To start,
+  copy tournament.example.json to tournament.json. Edit that file to update the
+  tournament; the page re-reads it on every refresh.
 
   Each round lists its games as { "white": user, "black": user, "id": "" }. Once a
   game starts, put its 8-character Lichess ID (or a link like
@@ -346,6 +347,7 @@ try { ({ Chess } = await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dis
 
   async function loadConfig() {
     const res = await fetch("tournament.json", { cache: "no-cache" });
+    if (res.status === 404) throw new Error("The file is missing. Copy tournament.example.json to tournament.json next to this page and edit it.");
     if (!res.ok) throw new Error(`The server answered with status ${res.status}.`);
     const text = await res.text();
     if (text === configText) return false;
