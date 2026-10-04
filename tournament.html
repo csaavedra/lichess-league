@@ -7,8 +7,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Spectral:wght@500;600;700&display=swap" rel="stylesheet">
-<!-- chess.js is only used to replay the moves of a game. No engine is loaded anywhere on this page. -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
 
 <!--
   The players, rounds and games live in tournament.json next to this file.
@@ -273,7 +271,12 @@ footer { color: var(--muted); font-size: 13.5px; border-top: 1px solid var(--lin
 
 <dialog id="dlg" aria-labelledby="dlg-title"></dialog>
 
-<script>
+<script type="module">
+// chess.js is only used to replay the moves of a game. No engine is loaded anywhere on this page.
+// If it fails to load, the rest of the page still works; games just can't be stepped through.
+let Chess = null;
+try { ({ Chess } = await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dist/esm/chess.js")); } catch {}
+
 (() => {
   const PIECE_URL = "https://lichess1.org/assets/piece/cburnett/";
   const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -440,17 +443,20 @@ footer { color: var(--muted); font-size: 13.5px; border-top: 1px solid var(--lin
 
   function fenKey(fen) { return String(fen || "").split(" ").slice(0, 2).join(" "); }
 
+  // chess.js throws on an illegal move; return null instead.
+  function tryMove(c, move) {
+    try { return c.move(move); } catch { return null; }
+  }
+
+  // The stream writes castling as the king's move (e1g1), which chess.js accepts.
   function playUci(c, uci) {
-    const from = uci.slice(0, 2), to = uci.slice(2, 4), promotion = uci[4];
-    let m = c.move({ from, to, promotion });
-    // Lichess may write castling as king-takes-rook (e1h1).
-    if (!m && /^e[18][ah][18]$/.test(uci)) m = c.move({ from, to: (to[0] === "h" ? "g" : "c") + to[1] });
-    return m;
+    return tryMove(c, { from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] });
   }
 
   function historyFromStream(list) {
     const positions = list.map((m) => ({ fen: m.fen, last: m.lm ? [m.lm.slice(0, 2), m.lm.slice(2, 4)] : null }));
-    const c = new Chess(list[0].fen);
+    let c;
+    try { c = new Chess(list[0].fen); } catch { return null; }
     const moves = list.slice(1).map((m) => (playUci(c, m.lm || "") || { san: m.lm }).san);
     return { moves, positions };
   }
@@ -756,10 +762,11 @@ footer { color: var(--muted); font-size: 13.5px; border-top: 1px solid var(--lin
   // ---------- game dialog ----------
   function buildPositions(g) {
     if (g.positions) return g.positions;
+    if (!Chess) return [{ fen: g.fen, last: g.last }];
     const c = new Chess();
     const list = [{ fen: c.fen(), last: null }];
     for (const san of g.moves) {
-      const m = c.move(san, { sloppy: true });
+      const m = tryMove(c, san);
       if (!m) break;
       list.push({ fen: c.fen(), last: [m.from, m.to] });
     }
