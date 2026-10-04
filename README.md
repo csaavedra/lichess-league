@@ -1,0 +1,89 @@
+# Correspondence tournament viewer
+
+A single static page that follows a round-robin chess tournament played on
+Lichess: a crosstable with tiebreaks, each round's games with live boards, a
+move-by-move game view, and each player's performance. Game data comes
+straight from the Lichess API, refreshed every few minutes. There is no
+server, no build step and no account.
+
+There is no engine or evaluation anywhere on the page, by design: it's meant
+for games still in progress.
+
+## Running it
+
+The page reads `tournament.json` next to it, so it has to be served over
+HTTP (browsers block reading it from `file://`):
+
+    cp tournament.example.json tournament.json
+    python3 -m http.server 8000
+
+Then open http://localhost:8000/tournament.html.
+
+To publish it, copy `tournament.html` (or rename it `index.html`), `lib.js`
+and `tournament.json` to any static host.
+
+## The tournament file
+
+`tournament.json` holds everything about the tournament. The page re-reads it
+on every refresh, so editing it is how you update the tournament.
+
+- `title`, `subtitle`: shown in the header.
+- `players`: each player's Lichess `username`, display `name`, `seed`, and a
+  `seedRating` (with `seedBasis`, the rating it came from). Seed ratings are
+  used for expected score and performance.
+- `rounds`: each round has a `name` and its `games`, as
+  `{ "white": username, "black": username, "id": "" }`.
+- `scoring`: points for a win, draw and loss (default 1, ½, 0).
+- `refreshSeconds`: how often to poll Lichess (default 300).
+
+Once a game starts on Lichess, put its 8-character ID (or its link, like
+`https://lichess.org/AbCd1234`) in `id`. The page flags a game whose players
+or colours don't match the schedule.
+
+> **Only ever paste the first 8 characters.** A player who copies the link
+> from their own game gets a 12-character URL; the last 4 characters are a
+> private token that lets anyone move for them. The page warns about such
+> IDs.
+
+## Standings
+
+Ties on points are broken, in order, by:
+
+1. TW: wins against the other players on the same points (draws don't count)
+2. Sonneborn–Berger
+3. Total wins
+4. Seed
+
+Performance uses the Lichess Swiss formula: the average of each opponent's
+rating, +500 for a win and −500 for a loss.
+
+## How it talks to Lichess
+
+- Games are fetched one at a time from `/game/export/{id}`. On a 429 the page
+  backs off for two minutes.
+- Lichess leaves the last few moves out of the export while a game is in
+  progress, so the page reads the full move list from the game stream when a
+  position changes.
+- Finished games are cached in `localStorage` and never fetched again.
+- [chess.js](https://github.com/jhlywa/chess.js) is loaded from jsDelivr only
+  to replay moves. If it fails to load, the standings and boards still work.
+
+## Theming
+
+Colours, fonts and radii are CSS variables in `:root`, with a dark-mode set.
+The page loads an optional `theme/theme.css` after its own styles to
+override them, and has an empty `.brand` slot in the header for a logo. The
+`theme/` folder is git-ignored. Without it the page uses its default look
+(and logs one 404).
+
+## Development
+
+The pure logic (standings, tiebreaks, player stats, ID parsing, time left)
+lives in `lib.js`, with no DOM or network access. Its tests need nothing
+beyond Node:
+
+    node --test
+
+## License
+
+MIT. See [LICENSE](LICENSE).
