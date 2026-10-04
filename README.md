@@ -112,8 +112,8 @@ only loads when no theme replaces them.
 
 The pure logic (standings, tiebreaks, player stats, ID parsing, time left)
 lives in `lib.js`, with no DOM or network access. Its tests need nothing
-beyond Node 22.7 or later, which runs `lib.js` as an ES module without a
-`package.json`:
+beyond Node 22 or later (`package.json` only marks the files as ES modules;
+there is nothing to install):
 
     node --test
 
