@@ -196,6 +196,8 @@ test("fmtPts", () => {
   assert.equal(fmtPts(3.5), "3½");
   assert.equal(fmtPts(1.25), "1.25");
   assert.equal(fmtPts(2.1), "2.1");
+  assert.equal(fmtPts(1.999999), "2");
+  assert.equal(fmtPts(1.005), "1");
 });
 
 test("time left to move", () => {

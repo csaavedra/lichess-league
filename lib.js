@@ -9,7 +9,7 @@ export const DEFAULT_SCORING = { win: 1, draw: 0.5, loss: 0 };
 export const fmtPts = (n) => {
   const whole = Math.floor(n), frac = n - whole;
   if (Math.abs(frac - 0.5) < 1e-9) return (whole ? whole : "") + "½";
-  return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0+$/, "");
+  return String(+n.toFixed(2));
 };
 
 // Correspondence: the player to move has daysPerTurn days from the last move

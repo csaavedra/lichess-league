@@ -197,7 +197,7 @@ dialog::backdrop { background: rgba(10, 14, 12, 0.6); }
 }
 .moves .no { color: var(--muted); padding: 5px 8px; background: var(--bg); font-size: 14px; }
 .move { padding: 5px 10px; cursor: pointer; border: 0; background: none; text-align: left; font: 500 15px/1.4 var(--font-text); color: var(--ink); border-radius: 0; }
-.move:hover { background: var(--self); }
+.move:hover { background: var(--self); color: var(--ink); }
 .move.cur { background: var(--accent-soft); font-weight: 700; }
 .dlg .side-panel { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .dlg .opening { font-size: 14px; color: var(--muted); }
@@ -489,6 +489,7 @@ try { ({ Chess } = await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dis
   }
 
   async function updateHistories() {
+    if (!Chess) return; // the streamed moves can't be replayed without it
     for (const g of state.games.values()) {
       if (g.result || !g.lastUci) continue;
       const h = histories.get(g.id);
@@ -684,12 +685,13 @@ try { ({ Chess } = await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dis
     }).join("");
   }
 
-  function renderSync(msg) {
-    const el = document.getElementById("sync");
-    const txt = document.getElementById("sync-text");
-    if (msg) { el.classList.add("stale"); txt.innerHTML = `<span class="dot"></span>${esc(msg)}`; return; }
-    el.classList.remove("stale");
-    txt.innerHTML = state.lastUpdate ? `<span class="dot"></span>Updated ${ago(state.lastUpdate)}` : `<span class="dot"></span>Loading games…`;
+  // A message replaces "Updated …" and stays until the next renderSync().
+  let syncMsg = "";
+  function renderSync(msg = "") {
+    syncMsg = msg;
+    const text = msg || (state.lastUpdate ? `Updated ${ago(state.lastUpdate)}` : "Loading games…");
+    document.getElementById("sync").classList.toggle("stale", !!msg);
+    document.getElementById("sync-text").innerHTML = `<span class="dot"></span>${esc(text)}`;
   }
 
   function renderNotice() {
@@ -980,7 +982,8 @@ try { ({ Chess } = await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dis
 
   // ---------- refresh loop ----------
   const FILE_HINT = " Browsers don't let a page opened straight from disk read other files. Serve the folder instead, for example with python3 -m http.server, and open http://localhost:8000/tournament.html.";
-  let busy = false;
+  const RATE_PAUSE_MS = 120000;
+  let busy = false, retryTimer = null;
   async function refresh(manual) {
     if (busy) return;
     busy = true;
@@ -1018,7 +1021,9 @@ try { ({ Chess } = await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dis
       showGames();
       renderAll();
       if (err.rate) {
-        state.pausedUntil = Date.now() + 120000;
+        state.pausedUntil = Date.now() + RATE_PAUSE_MS;
+        clearTimeout(retryTimer);
+        retryTimer = setTimeout(refresh, RATE_PAUSE_MS);
         renderSync("Lichess asked us to slow down. Retrying in 2 minutes.");
       } else {
         renderSync("Update failed");
@@ -1044,7 +1049,7 @@ try { ({ Chess } = await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dis
   })();
   setInterval(() => {
     tickDeadlines();
-    if (state.lastUpdate && !busy && Date.now() >= state.pausedUntil) renderSync();
+    if (state.lastUpdate && !busy && !syncMsg) renderSync();
   }, 15000);
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden && (!state.lastUpdate || Date.now() - state.lastUpdate > 30000)) refresh();
