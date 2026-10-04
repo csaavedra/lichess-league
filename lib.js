@@ -3,7 +3,7 @@
 
 export const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 export const ONGOING = new Set(["created", "started"]);
-export const VOID = new Set(["aborted", "noStart"]);
+const VOID = new Set(["aborted", "noStart"]);
 export const DEFAULT_SCORING = { win: 1, draw: 0.5, loss: 0 };
 
 export const fmtPts = (n) => {
@@ -11,6 +11,8 @@ export const fmtPts = (n) => {
   if (Math.abs(frac - 0.5) < 1e-9) return (whole ? whole : "") + "½";
   return String(+n.toFixed(2));
 };
+
+export const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 // Correspondence: the player to move has daysPerTurn days from the last move
 // (or the game's creation), as on Lichess. The export has no clock object.
@@ -23,7 +25,7 @@ export function deadlineOf(g) {
 export function fmtLeft(ms) {
   if (ms <= 0) return "out of time";
   const min = Math.floor(ms / 60000), h = Math.floor(min / 60), d = Math.floor(h / 24);
-  if (d) return `${d} day${d === 1 ? "" : "s"}${h % 24 ? ` ${h % 24} h` : ""} left`;
+  if (d) return `${plural(d, "day")}${h % 24 ? ` ${h % 24} h` : ""} left`;
   if (h) return `${h} h${min % 60 ? ` ${min % 60} min` : ""} left`;
   return min ? `${min} min left` : "less than a minute left";
 }
@@ -39,15 +41,15 @@ export function extractId(raw) {
 export const isPrivateId = (raw) => /^[A-Za-z0-9]{12}$/.test(stripLink(raw));
 
 // ---------- games ----------
-export function playerOf(p) {
-  if (p && p.user) return { id: p.user.id || p.user.name.toLowerCase(), username: p.user.name, rating: p.rating ?? null, ratingDiff: p.ratingDiff ?? null, provisional: !!p.provisional };
+function playerOf(p) {
+  if (p?.user) return { id: p.user.id || p.user.name.toLowerCase(), username: p.user.name, rating: p.rating ?? null, ratingDiff: p.ratingDiff ?? null, provisional: !!p.provisional };
   return { id: "?anon", username: "Anonymous", rating: null, ratingDiff: null, provisional: false };
 }
 
 // A game from the Lichess export, reduced to what the page uses.
 export function summarize(g) {
-  const white = playerOf(g.players && g.players.white);
-  const black = playerOf(g.players && g.players.black);
+  const white = playerOf(g.players?.white);
+  const black = playerOf(g.players?.black);
   const moves = (g.moves || "").split(" ").filter(Boolean);
   const fen = g.lastFen || START_FEN;
   let result = null;
@@ -85,12 +87,13 @@ export function computeStandings(rounds, games, players, sc = DEFAULT_SCORING) {
     const b = ensure(g.black.id, g.black.username, true);
     if (g.result === "void") return;
     if (!g.result) { cell(w, b).push({ live: true }); cell(b, w).push({ live: true }); return; }
-    const [ws, bs] = g.result === "1-0" ? [sc.win, sc.loss] : g.result === "0-1" ? [sc.loss, sc.win] : [sc.draw, sc.draw];
-    w.pts += ws; b.pts += bs; w.played++; b.played++;
-    if (g.result === "1-0") w.wins++;
-    if (g.result === "0-1") b.wins++;
-    cell(w, b).push({ s: ws, kind: g.result === "½-½" ? "d" : ws > bs ? "w" : "l" });
-    cell(b, w).push({ s: bs, kind: g.result === "½-½" ? "d" : bs > ws ? "w" : "l" });
+    const [wk, bk] = { "1-0": "wl", "0-1": "lw", "½-½": "dd" }[g.result];
+    for (const [me, opp, kind] of [[w, b, wk], [b, w, bk]]) {
+      const s = { w: sc.win, d: sc.draw, l: sc.loss }[kind];
+      me.pts += s; me.played++;
+      if (kind === "w") me.wins++;
+      cell(me, opp).push({ s, kind });
+    }
   }));
 
   P.forEach((p) => {
@@ -100,10 +103,10 @@ export function computeStandings(rounds, games, players, sc = DEFAULT_SCORING) {
     });
   });
 
-  // Tiebreaks, in order: wins against the players tied on points, then
-  // Sonneborn–Berger, then total wins.
-  const seedOf = (id) => (players.get(id) || {}).seed ?? null;
-  const nameOf = (p) => (players.get(p.id) || {}).name || p.username;
+  // Tiebreaks, in order: wins against the players tied on points,
+  // Sonneborn–Berger, total wins, seed, and finally name.
+  const seedOf = (id) => players.get(id)?.seed ?? null;
+  const nameOf = (p) => players.get(p.id)?.name || p.username;
   const list = [...P.values()].filter((p) => p.id !== "?anon");
   list.forEach((p) => {
     const tied = list.filter((o) => o !== p && Math.abs(o.pts - p.pts) < 1e-9);
@@ -126,7 +129,7 @@ export function scheduleMismatch(slot, g) {
 }
 
 // ---------- player stats ----------
-export const expected = (me, opp) => 1 / (1 + Math.pow(10, (opp - me) / 400));
+const expected = (me, opp) => 1 / (1 + Math.pow(10, (opp - me) / 400));
 
 export function playerGames(pid, rounds, games) {
   const list = [];
@@ -143,7 +146,7 @@ export function playerGames(pid, rounds, games) {
 }
 
 export function playerStats(list, players, sc = DEFAULT_SCORING) {
-  const seedRatingOf = (id) => (players.get(id) || {}).seedRating ?? null;
+  const seedRatingOf = (id) => players.get(id)?.seedRating ?? null;
   const st = { n: 0, w: 0, d: 0, l: 0, frac: 0, pts: 0, exp: 0, expN: 0, oppSum: 0, oppN: 0, perfSum: 0, diff: 0, diffN: 0, live: 0,
     white: { n: 0, pts: 0 }, black: { n: 0, pts: 0 } };
   list.forEach(({ g, color, me, opp, score }) => {

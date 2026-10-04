@@ -62,7 +62,7 @@
   }
 }
 * { box-sizing: border-box; }
-html, body { margin: 0; }
+body { margin: 0; }
 body {
   background: var(--bg);
   color: var(--ink);
@@ -93,7 +93,7 @@ button {
   border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 9px 14px; cursor: pointer;
 }
 button:hover { border-color: var(--muted); }
-button:focus-visible, a:focus-visible, .game:focus-visible, .move:focus-visible {
+button:focus-visible, a:focus-visible, .game:focus-visible, .cross .pname:focus-visible {
   outline: 2px solid var(--accent); outline-offset: 2px;
 }
 
@@ -101,7 +101,6 @@ button:focus-visible, a:focus-visible, .game:focus-visible, .move:focus-visible 
   background: var(--warn-soft); border-left: 3px solid var(--warn);
   padding: 12px 16px; margin: 0 0 24px; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; font-size: 15px;
 }
-.notice[hidden] { display: none; }
 
 h2 { font: var(--display-weight) 22px/1.2 var(--font-display); margin: 0 0 14px; color: var(--heading); }
 section { margin-bottom: 40px; }
@@ -111,17 +110,18 @@ section { margin-bottom: 40px; }
 table.cross { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
 .cross th, .cross td { padding: 10px 8px; text-align: center; border-bottom: 1px solid var(--line); white-space: nowrap; }
 .cross tr:last-child td { border-bottom: 0; }
-.cross thead th { font-size: 13px; font-weight: 600; color: var(--muted); background: transparent; }
+.cross thead th { font-size: 13px; font-weight: 600; color: var(--muted); }
 .cross td.rank { color: var(--muted); width: 36px; }
-.cross td.name { text-align: left; padding-left: 4px; min-width: 160px; }
+.cross .name { text-align: left; padding-left: 4px; min-width: 160px; }
 .cross td.name strong { font: var(--display-weight) 17px/1.2 var(--font-display); }
 .cross td.name small { display: block; color: var(--muted); font-size: 12.5px; }
+.cross td.blank { padding: 18px; }
 .cross td.res { width: 44px; font-weight: 600; }
 .cross td.self { background: var(--self); }
-.cross td.res .live { color: var(--live); font-size: 12px; font-weight: 600; }
+.cross td.res .live { color: var(--live); font-size: 12px; }
 .cross td.res .l { color: var(--muted); font-weight: 500; }
 .cross td.pts { font: 700 19px/1 var(--font-display); width: 64px; }
-.cross td.sb, .cross td.gp { color: var(--muted); width: 56px; font-size: 14px; }
+.cross td.minor { color: var(--muted); width: 56px; font-size: 14px; }
 .cross tbody tr:first-child td.pts { color: var(--accent); }
 .legend { color: var(--muted); font-size: 13px; margin: 8px 2px 0; }
 
@@ -187,6 +187,7 @@ dialog::backdrop { background: rgba(10, 14, 12, 0.6); }
 .dlg .head { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
 .dlg h3 { font: var(--display-weight) 22px/1.25 var(--font-display); margin: 0; color: var(--heading); }
 .dlg .head p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+.dlg-board { margin: 8px 0; }
 .dlg .controls { display: flex; gap: 6px; margin-top: 12px; justify-content: center; }
 .dlg .controls button { min-width: 48px; font-size: 16px; }
 .dlg .keys { margin: 8px 0 0; text-align: center; color: var(--muted); font-size: 12.5px; }
@@ -195,6 +196,7 @@ dialog::backdrop { background: rgba(10, 14, 12, 0.6); }
   max-height: min(60vh, 520px); overflow-y: auto; border: 1px solid var(--line); border-radius: var(--radius-sm);
   display: grid; grid-template-columns: 44px 1fr 1fr; align-content: start; font-variant-numeric: tabular-nums;
 }
+.moves .none { grid-column: 2 / -1; padding: 5px 10px; color: var(--muted); }
 .moves .no { color: var(--muted); padding: 5px 8px; background: var(--bg); font-size: 14px; }
 .move { padding: 5px 10px; cursor: pointer; border: 0; background: none; text-align: left; font: 500 15px/1.4 var(--font-text); color: var(--ink); border-radius: 0; }
 .move:hover { background: var(--self); color: var(--ink); }
@@ -207,15 +209,16 @@ dialog::backdrop { background: rgba(10, 14, 12, 0.6); }
 /* Player view */
 .cross .pname { all: unset; cursor: pointer; display: block; border-radius: 3px; }
 .cross .pname:hover strong { text-decoration: underline; text-underline-offset: 3px; }
-.cross .pname:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .dlg.pdlg { grid-template-columns: minmax(0, 1fr); gap: 20px; }
 .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 .tile { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; }
 .tile .k { font-size: 12.5px; color: var(--muted); font-weight: 600; }
 .tile .v { font: 700 26px/1.15 var(--font-display); font-variant-numeric: tabular-nums; margin: 2px 0; }
 .tile .s { font-size: 12.5px; color: var(--muted); }
+.tile .v small { font-size: 16px; color: var(--muted); }
 .tile .v.up { color: var(--live); }
 .pdlg .facts { margin: 0; font-size: 14px; color: var(--muted); line-height: 1.6; }
+.pdlg .facts.fine { font-size: 12.5px; }
 .pdlg .facts b { color: var(--ink); font-weight: 600; }
 .pdlg h4 { font: var(--display-weight) 17px/1.2 var(--font-display); margin: 0 0 8px; color: var(--heading); }
 table.pgames { border-collapse: collapse; width: 100%; font-size: 14.5px; font-variant-numeric: tabular-nums; }
@@ -229,7 +232,8 @@ table.pgames { border-collapse: collapse; width: 100%; font-size: 14.5px; font-v
 .pgames .chip, .upcoming .chip { margin-right: 8px; }
 .pgames td.opp .rt, .pgames td.note { color: var(--muted); font-weight: 500; }
 .pgames td.note { white-space: normal; min-width: 160px; }
-.pgames td.r { font-weight: 700; text-align: center; }
+.pgames .r { text-align: center; }
+.pgames td.r { font-weight: 700; }
 .pgames td.r .live { color: var(--live); font-weight: 600; font-size: 13px; }
 .pgames .num { text-align: right; }
 .upcoming { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px 16px; font-size: 14px; color: var(--muted); }
@@ -286,8 +290,8 @@ footer { color: var(--muted); font-size: 13.5px; border-top: 1px solid var(--lin
 
 <script type="module">
 import {
-  START_FEN, ONGOING, DAY_MS, fmtPts, deadlineOf, fmtLeft, stripLink, extractId, isPrivateId, summarize,
-  computeStandings as standingsOf, scheduleMismatch as mismatchOf, playerGames as gamesOf, playerStats as statsOf,
+  START_FEN, ONGOING, DAY_MS, DEFAULT_SCORING, fmtPts, plural, deadlineOf, fmtLeft, extractId, isPrivateId, summarize,
+  computeStandings, scheduleMismatch, playerGames, playerStats,
 } from "./lib.js";
 
 // chess.js is only used to replay the moves of a game. No engine is loaded anywhere on this page.
@@ -339,8 +343,8 @@ try { ({ Chess } = await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dis
   }
 
   // ---------- config parsing ----------
-  let CONFIG = null, configText = null;
-  let rounds = [], allIds = [], configNames = new Map(), sc = { win: 1, draw: 0.5, loss: 0 };
+  let config = null, configText = null;
+  let rounds = [], allIds = [], roster = new Map(), scoring = DEFAULT_SCORING;
   const notices = { config: "", ids: "", schedule: "", fetch: "" };
   const liveGames = new Map(); // id -> latest export of a game not finished yet
   const notFound = new Set();
@@ -360,7 +364,7 @@ try { ({ Chess } = await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dis
   }
 
   function applyConfig(cfg) {
-    CONFIG = cfg;
+    config = cfg;
     const cfgRounds = Array.isArray(cfg.rounds) ? cfg.rounds : [];
     // Each game is a scheduled pairing { white, black, id }; the id stays
     // empty until the game is created on Lichess.
@@ -374,13 +378,13 @@ try { ({ Chess } = await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dis
     });
     allIds = [...new Set(rounds.flatMap((r) => r.ids))];
     const num = (n) => (Number.isFinite(n) ? n : null);
-    configNames = new Map(
+    roster = new Map(
       (cfg.players || []).filter((p) => p.username).map((p) => [p.username.toLowerCase(), {
         username: p.username, name: p.name || "",
         seed: num(p.seed), seedRating: num(p.seedRating), seedBasis: p.seedBasis || "",
       }])
     );
-    sc = Object.assign({ win: 1, draw: 0.5, loss: 0 }, cfg.scoring || {});
+    scoring = { ...DEFAULT_SCORING, ...cfg.scoring };
 
     const title = cfg.title || "Correspondence round-robin";
     document.getElementById("title").textContent = title;
@@ -396,7 +400,7 @@ try { ({ Chess } = await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dis
     const allSlots = rounds.flatMap((r) => r.slots);
     const badIds = allSlots.filter((x) => x.raw && !x.id).map((x) => x.raw);
     const privateIds = allSlots.map((x) => x.raw).filter(isPrivateId);
-    const unknown = [...new Set(allSlots.flatMap((x) => [x.white, x.black]).filter((u) => !configNames.has(u)))];
+    const unknown = [...new Set(allSlots.flatMap((x) => [x.white, x.black]).filter((u) => !roster.has(u)))];
     const warnings = [];
     if (unknown.length) warnings.push(`These usernames appear in the schedule in tournament.json but not in its players list: ${unknown.map((u) => u || "(empty)").join(", ")}.`);
     if (privateIds.length) warnings.push(`Shorten these to their first 8 characters in tournament.json: ${privateIds.join(", ")}. The extra 4 characters are a player's private token that lets anyone move for them, and should never be shared.`);
@@ -409,11 +413,12 @@ try { ({ Chess } = await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dis
   // (/api/games/export/_ids) allows only 2 concurrent requests per IP address,
   // and Lichess can keep that slot taken long after a request ends, which
   // blocks the page for everyone on the same network.
+  const rateError = () => Object.assign(new Error("rate"), { rate: true });
   const EXPORT_PARAMS = "moves=true&lastFen=true&opening=true&evals=false&clocks=false&accuracy=false&literate=false";
   async function fetchGame(id) {
     const res = await fetch(`https://lichess.org/game/export/${id}?${EXPORT_PARAMS}`, { headers: { Accept: "application/json" } });
     if (res.status === 404) return null;
-    if (res.status === 429) { const e = new Error("rate"); e.rate = true; throw e; }
+    if (res.status === 429) throw rateError();
     if (!res.ok) throw new Error(`Lichess answered with status ${res.status}.`);
     return res.json();
   }
@@ -422,15 +427,16 @@ try { ({ Chess } = await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dis
   // anti-cheat delay), although lastFen is current. The game stream has the
   // full history, so read it until it reaches the exported position, then stop.
   const histories = new Map(); // id -> { key, moves, positions }
+  const STREAM_TIMEOUT_MS = 15000;
 
   async function fetchHistory(g) {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 15000);
+    const timer = setTimeout(() => ctrl.abort(), STREAM_TIMEOUT_MS);
     const target = fenKey(g.fen);
     const list = [];
     try {
       const res = await fetch(`https://lichess.org/api/stream/game/${g.id}`, { signal: ctrl.signal, headers: { Accept: "application/x-ndjson" } });
-      if (res.status === 429) { const e = new Error("rate"); e.rate = true; throw e; }
+      if (res.status === 429) throw rateError();
       if (!res.ok || !res.body) return null;
       const reader = res.body.getReader();
       const dec = new TextDecoder();
@@ -515,16 +521,13 @@ try { ({ Chess } = await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dis
     try { localStorage.setItem(CACHE_KEY, JSON.stringify(finishedCache)); } catch { /* storage full or blocked */ }
   }
 
-  const seedOf = (id) => (configNames.get(id) || {}).seed ?? null;
+  const seedOf = (id) => roster.get(id)?.seed ?? null;
   const ordinal = (n) => n + ((n % 100 >= 11 && n % 100 <= 13) ? "th" : ["th", "st", "nd", "rd"][n % 10] || "th");
-  const plainPlayer = (id) => ({ id, username: (configNames.get(id) || {}).username || id });
+  // A player from a game (Lichess has the right capitalisation), or a username from the schedule.
+  const displayName = (p) => roster.get(p.id)?.name || p.username;
+  const nameOf = (id) => roster.get(id)?.name || roster.get(id)?.username || id;
 
-  function displayName(p) {
-    return (configNames.get(p.id) || {}).name || p.username;
-  }
-
-  // ---------- standings ----------
-  const computeStandings = () => standingsOf(rounds, state.games, configNames, sc);
+  const standings = () => computeStandings(rounds, state.games, roster, scoring);
 
   // ---------- rendering ----------
   function boardHTML(fen, last) {
@@ -553,19 +556,19 @@ try { ({ Chess } = await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dis
   }
 
   function renderStandings() {
-    const rows = computeStandings();
+    const rows = standings();
     const t = document.getElementById("cross");
     if (!rows.length) {
-      t.innerHTML = '<tbody><tr><td class="name" style="padding:18px">Players appear here once you add usernames or game IDs to tournament.json.</td></tr></tbody>';
+      t.innerHTML = '<tbody><tr><td class="name blank">Players appear here once you add usernames or game IDs to tournament.json.</td></tr></tbody>';
       return;
     }
-    let html = '<thead><tr><th>#</th><th style="text-align:left;padding-left:4px">Player</th><th title="Starting seed">Seed</th>';
+    let html = '<thead><tr><th>#</th><th class="name">Player</th><th title="Starting seed">Seed</th>';
     rows.forEach((_, i) => { html += `<th>${i + 1}</th>`; });
     html += '<th>Pts</th><th title="Wins against the players tied on points">TW</th><th title="Sonneborn–Berger">SB</th><th>Wins</th><th>Played</th></tr></thead><tbody>';
     rows.forEach((p, i) => {
       const nm = displayName(p);
       const sub = nm !== p.username ? `<small>${esc(p.username)}</small>` : "";
-      html += `<tr><td class="rank">${i + 1}</td><td class="name"><button type="button" class="pname" data-player="${esc(p.id)}" aria-label="${esc(nm)}, show performance"><strong>${esc(nm)}</strong>${sub}</button></td><td class="sb">${seedOf(p.id) ?? ""}</td>`;
+      html += `<tr><td class="rank">${i + 1}</td><td class="name"><button type="button" class="pname" data-player="${esc(p.id)}" aria-label="${esc(nm)}, show performance"><strong>${esc(nm)}</strong>${sub}</button></td><td class="minor">${seedOf(p.id) ?? ""}</td>`;
       rows.forEach((o) => {
         if (o.id === p.id) { html += '<td class="res self"></td>'; return; }
         const list = p.cells.get(o.id) || [];
@@ -574,7 +577,7 @@ try { ({ Chess } = await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dis
           : `<span class="${c.kind}">${c.kind === "w" ? "1" : c.kind === "d" ? "½" : "0"}</span>`);
         html += `<td class="res">${parts.join(" ")}</td>`;
       });
-      html += `<td class="pts">${fmtPts(p.pts) || "0"}</td><td class="sb">${p.tied ? p.tiedWins : ""}</td><td class="sb">${fmtPts(Math.round(p.sb * 100) / 100) || "0"}</td><td class="gp">${p.wins}</td><td class="gp">${p.played}</td></tr>`;
+      html += `<td class="pts">${fmtPts(p.pts)}</td><td class="minor">${p.tied ? p.tiedWins : ""}</td><td class="minor">${fmtPts(p.sb)}</td><td class="minor">${p.wins}</td><td class="minor">${p.played}</td></tr>`;
     });
     t.innerHTML = html + "</tbody>";
   }
@@ -590,10 +593,10 @@ try { ({ Chess } = await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dis
   }
 
   // A game whose players or colours differ from its slot in the schedule.
-  function scheduleMismatch(slot, g) {
-    const kind = mismatchOf(slot, g);
+  function mismatchText(slot, g) {
+    const kind = scheduleMismatch(slot, g);
     if (!kind) return "";
-    const want = `${displayName(plainPlayer(slot.white))} (white) against ${displayName(plainPlayer(slot.black))} (black)`;
+    const want = `${nameOf(slot.white)} (white) against ${nameOf(slot.black)} (black)`;
     if (kind === "reversed") return `Colours are reversed: the schedule has ${want}.`;
     return `This is not the scheduled game: the schedule has ${want}.`;
   }
@@ -601,7 +604,7 @@ try { ({ Chess } = await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dis
   function scheduleNotice() {
     const issues = [];
     rounds.forEach((r) => r.slots.forEach((slot) => {
-      const msg = scheduleMismatch(slot, slot.id && state.games.get(slot.id));
+      const msg = mismatchText(slot, slot.id && state.games.get(slot.id));
       if (msg) issues.push(`${r.name}, game ${slot.id}: ${msg}`);
     }));
     return issues.join(" ");
@@ -624,26 +627,25 @@ try { ({ Chess } = await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dis
 
   function sideHTML(p, color, g) {
     const toMove = !g.result && g.turn === color;
-    const lost = g.result && ((color === "white" && g.result === "0-1") || (color === "black" && g.result === "1-0"));
     let score = "";
     if (g.result && g.result !== "void") {
       score = g.result === "½-½" ? "½" : (color === "white") === (g.result === "1-0") ? "1" : "0";
     }
-    return `<div class="side${toMove ? " to-move" : ""}${lost ? " lost" : ""}"><span class="chip ${color[0]}"></span><span class="nm">${esc(displayName(p))}${ratingHTML(p)}</span><span class="sc">${score}</span></div>`;
+    return `<div class="side${toMove ? " to-move" : ""}${score === "0" ? " lost" : ""}"><span class="chip ${color[0]}"></span><span class="nm">${esc(displayName(p))}${ratingHTML(p)}</span><span class="sc">${score}</span></div>`;
   }
 
   function plainSideHTML(id, color) {
-    return `<div class="side"><span class="chip ${color[0]}"></span><span class="nm">${esc(displayName(plainPlayer(id)))}</span></div>`;
+    return `<div class="side"><span class="chip ${color[0]}"></span><span class="nm">${esc(nameOf(id))}</span></div>`;
   }
 
   function statusText(g) {
     if (g.result === "void") return "Aborted. This game does not count.";
-    const moveNo = Math.ceil(g.moves.length / 2) || 0;
+    const moveNo = Math.ceil(g.moves.length / 2);
     if (g.result) {
       const why = REASONS[g.status] || "finished";
-      return `<b>${g.result}</b> by ${why}, ${moveNo} move${moveNo === 1 ? "" : "s"}`;
+      return `<b>${g.result}</b> by ${why}, ${plural(moveNo, "move")}`;
     }
-    if (!g.moves.length) return `<b>Not started.</b> White to make the first move.`;
+    if (!g.moves.length) return "<b>Not started.</b> White to make the first move.";
     const who = displayName(g.turn === "white" ? g.white : g.black);
     const left = leftHTML(g);
     return `<b>${esc(who)} to move</b>${left ? `, ${left}` : ""}<br>Move ${g.turn === "white" ? moveNo + 1 : moveNo}, last move ${ago(g.lastMoveAt)}`;
@@ -674,7 +676,7 @@ try { ({ Chess } = await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dis
           <div class="status">${status}</div>
         </div>`;
       }
-      const mismatch = scheduleMismatch(slot, g);
+      const mismatch = mismatchText(slot, g);
       return `<div class="game" role="button" tabindex="0" data-id="${esc(g.id)}" aria-label="${esc(displayName(g.white))} against ${esc(displayName(g.black))}, open game">
         ${sideHTML(g.black, "black", g)}
         ${boardHTML(g.fen, g.last)}
@@ -696,7 +698,7 @@ try { ({ Chess } = await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dis
 
   function renderNotice() {
     const el = document.getElementById("notice");
-    const msg = [notices.config, notices.ids, notices.schedule, notices.fetch].filter(Boolean).join(" ");
+    const msg = Object.values(notices).filter(Boolean).join(" ");
     el.hidden = !msg;
     el.textContent = msg;
   }
@@ -728,9 +730,9 @@ try { ({ Chess } = await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dis
   function openGame(id, back) {
     const g = state.games.get(id);
     if (!g) return;
-    const positions = buildPositions(g);
     state.player = null;
-    state.open = { id, positions, ply: positions.length - 1, back: back || null };
+    // renderDialog() fills in the positions and moves to the latest one.
+    state.open = { id, positions: [], ply: -1, back: back || null };
     renderDialog();
     const d = document.getElementById("dlg");
     if (!d.open) d.showModal();
@@ -749,7 +751,7 @@ try { ({ Chess } = await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dis
     }
     const ply = state.open.ply;
     const cur = state.open.positions[ply];
-    const rName = (rounds.find((r) => r.ids.includes(id)) || {}).name || "";
+    const rName = rounds.find((r) => r.ids.includes(id))?.name || "";
 
     let movesHTML = '<div class="moves" id="moves">';
     for (let i = 0; i < g.moves.length; i += 2) {
@@ -759,7 +761,7 @@ try { ({ Chess } = await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dis
         else movesHTML += "<span></span>";
       }
     }
-    if (!g.moves.length) movesHTML += '<div class="no"></div><span class="move" style="cursor:default;color:var(--muted)">No moves yet</span><span></span>';
+    if (!g.moves.length) movesHTML += '<div class="no"></div><span class="none">No moves yet</span>';
     movesHTML += "</div>";
 
     const d = document.getElementById("dlg");
@@ -767,16 +769,16 @@ try { ({ Chess } = await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dis
       <div class="head">
         <div>
           <h3 id="dlg-title">${esc(displayName(g.white))} against ${esc(displayName(g.black))}</h3>
-          <p>${esc(rName)}${g.daysPerTurn ? `, ${g.daysPerTurn} day${g.daysPerTurn > 1 ? "s" : ""} per move` : ""}</p>
+          <p>${esc(rName)}${g.daysPerTurn ? `, ${plural(g.daysPerTurn, "day")} per move` : ""}</p>
         </div>
         <div class="actions">
-          ${state.open.back ? `<button type="button" data-act="back">← ${esc(displayName(plainPlayer(state.open.back)))}</button>` : ""}
+          ${state.open.back ? `<button type="button" data-act="back">← ${esc(nameOf(state.open.back))}</button>` : ""}
           <button type="button" data-act="close">Close</button>
         </div>
       </div>
       <div>
         ${sideHTML(g.black, "black", g)}
-        <div style="margin:8px 0" id="dlg-board">${boardHTML(cur.fen, cur.last)}</div>
+        <div class="dlg-board" id="dlg-board">${boardHTML(cur.fen, cur.last)}</div>
         ${sideHTML(g.white, "white", g)}
         <div class="controls">
           <button type="button" data-act="first" aria-label="First position">⏮</button>
@@ -815,9 +817,6 @@ try { ({ Chess } = await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dis
   // ---------- player view ----------
   const signed = (n, digits = 0) => (n > 0 ? "+" : n < 0 ? "−" : "±") + Math.abs(n).toFixed(digits);
 
-  const playerGames = (pid) => gamesOf(pid, rounds, state.games);
-  const playerStats = (list) => statsOf(list, configNames, sc);
-
   function openPlayer(pid) {
     state.open = null;
     state.player = pid;
@@ -833,36 +832,37 @@ try { ({ Chess } = await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dis
 
   function renderPlayer() {
     const pid = state.player;
-    const table = computeStandings();
+    const table = standings();
     const rank = table.findIndex((p) => p.id === pid);
     const row = table[rank];
     if (!row) return;
-    const list = playerGames(pid);
-    const st = playerStats(list);
+    const list = playerGames(pid, rounds, state.games);
+    const st = playerStats(list, roster, scoring);
     const nm = displayName(row);
     const firstGame = [...list].sort((a, b) => (a.g.createdAt || 0) - (b.g.createdAt || 0))[0];
-    const startRating = firstGame && firstGame.me.rating != null ? firstGame.me.rating : null;
+    const startRating = firstGame?.me.rating ?? null;
     const toPlay = rounds.flatMap((r) => r.slots
       .filter((x) => !x.id && (x.white === pid || x.black === pid))
       .map((x) => {
         const color = x.white === pid ? "white" : "black";
         const opp = x.white === pid ? x.black : x.white;
-        return `<li><span class="chip ${color[0]}" title="With ${color}"></span>${esc(r.name)} · <b>${esc(displayName(plainPlayer(opp)))}</b></li>`;
+        return `<li><span class="chip ${color[0]}" title="With ${color}"></span>${esc(r.name)} · <b>${esc(nameOf(opp))}</b></li>`;
       }));
-    const cfgP = configNames.get(pid) || {};
+    const cfgP = roster.get(pid) || {};
     const seed = cfgP.seed ?? null;
     const moved = seed != null ? seed - (rank + 1) : 0;
     const pct = st.n ? Math.round((st.frac / st.n) * 100) : null;
-    const colorLine = (c) => `With ${c}: ` + (st[c].n ? `<b>${fmtPts(st[c].pts) || "0"} of ${st[c].n}</b>` : "no finished games");
+    const colorLine = (c) => `With ${c}: ` + (st[c].n ? `<b>${fmtPts(st[c].pts)} of ${st[c].n}</b>` : "no finished games");
+    const now = `now ${ordinal(rank + 1)}`;
 
     const tiles = [
-      tile("Rank", `${rank + 1}<span style="font-size:16px;color:var(--muted)">/${table.length}</span>`, `${row.tied ? `TW ${row.tiedWins} · ` : ""}SB ${fmtPts(Math.round(row.sb * 100) / 100) || "0"} · ${row.wins} win${row.wins === 1 ? "" : "s"}`),
-      seed != null ? tile("Seed", seed, moved > 0 ? `now ${ordinal(rank + 1)}, up ${moved} place${moved === 1 ? "" : "s"}` : moved < 0 ? `now ${ordinal(rank + 1)}, down ${-moved} place${moved === -1 ? "" : "s"}` : `now ${ordinal(rank + 1)}, as seeded`, moved > 0 ? "up" : "") : "",
-      tile("Points", fmtPts(st.pts) || "0", st.n ? `from ${st.n} finished game${st.n === 1 ? "" : "s"}, ${pct}%` : "no finished games yet"),
+      tile("Rank", `${rank + 1}<small>/${table.length}</small>`, `${row.tied ? `TW ${row.tiedWins} · ` : ""}SB ${fmtPts(row.sb)} · ${plural(row.wins, "win")}`),
+      seed != null ? tile("Seed", seed, moved ? `${now}, ${moved > 0 ? "up" : "down"} ${plural(Math.abs(moved), "place")}` : `${now}, as seeded`, moved > 0 ? "up" : "") : "",
+      tile("Points", fmtPts(st.pts), st.n ? `from ${plural(st.n, "finished game")}, ${pct}%` : "no finished games yet"),
       tile("Won · drawn · lost", `${st.w} · ${st.d} · ${st.l}`, st.live ? `${st.live} in progress` : "none in progress"),
       tile("Performance", st.perf != null ? st.perf : "—", st.avgOpp != null ? `average opponent ${st.avgOpp} (seed ratings)` : "needs a finished game"),
       tile("Rating change", st.diffN ? signed(st.diff) : "—", startRating != null ? `${startRating} at the first game` : "no rated games yet", st.diff > 0 ? "up" : ""),
-      tile("Against expectation", st.expN ? signed(st.frac - st.exp, 1) : "—", st.expN ? `expected ${(st.exp).toFixed(1)} from seed ratings` : "needs a finished game", st.frac - st.exp > 0.05 && st.expN ? "up" : ""),
+      tile("Against expectation", st.expN ? signed(st.frac - st.exp, 1) : "—", st.expN ? `expected ${st.exp.toFixed(1)} from seed ratings` : "needs a finished game", st.frac - st.exp > 0.05 && st.expN ? "up" : ""),
     ].join("");
 
     const rowsHTML = list.map(({ g, round, color, me, opp, score }) => {
@@ -903,10 +903,10 @@ try { ({ Chess } = await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dis
       <div>
         <h4>Games</h4>
         ${list.length ? `<div class="table-scroll"><table class="pgames">
-          <thead><tr><th>Round</th><th>Opponent</th><th style="text-align:center">Result</th><th class="num">Rating</th><th class="num">Moves</th><th>Notes</th></tr></thead>
+          <thead><tr><th>Round</th><th>Opponent</th><th class="r">Result</th><th class="num">Rating</th><th class="num">Moves</th><th>Notes</th></tr></thead>
           <tbody>${rowsHTML}</tbody></table></div>` : '<p class="facts">No games yet.</p>'}
       </div>
-      <p class="facts" style="font-size:12.5px">Ratings next to names are Lichess correspondence ratings at the start of each game. Performance and expected score use the seed ratings, each player's fixed rating for the tournament, because many Lichess correspondence ratings here are still provisional. Performance is Lichess's tournament performance over finished games: the average of each opponent's rating, plus 500 for a win and minus 500 for a loss. Rating change adds up what Lichess awarded for the finished games in this tournament.</p>
+      <p class="facts fine">Ratings next to names are Lichess correspondence ratings at the start of each game. Performance and expected score use the seed ratings, each player's fixed rating for the tournament, because many Lichess correspondence ratings here are still provisional. Performance is Lichess's tournament performance over finished games: the average of each opponent's rating, plus 500 for a win and minus 500 for a loss. Rating change adds up what Lichess awarded for the finished games in this tournament.</p>
     </div>`;
   }
 
@@ -982,7 +982,7 @@ try { ({ Chess } = await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dis
 
   // ---------- refresh loop ----------
   const FILE_HINT = " Browsers don't let a page opened straight from disk read other files. Serve the folder instead, for example with python3 -m http.server, and open http://localhost:8000/tournament.html.";
-  const RATE_PAUSE_MS = 120000;
+  const RATE_PAUSE_MS = 120000, DEFAULT_REFRESH_S = 300, MIN_REFRESH_S = 20;
   let busy = false, retryTimer = null;
   async function refresh(manual) {
     if (busy) return;
@@ -994,10 +994,10 @@ try { ({ Chess } = await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dis
       } catch (err) {
         notices.config = `Could not read tournament.json. ${err.message || ""}` +
           (location.protocol === "file:" ? FILE_HINT : "") +
-          (CONFIG ? " Showing the last version that loaded." : "");
+          (config ? " Showing the last version that loaded." : "");
       }
       renderNotice();
-      if (!CONFIG) { renderSync("No tournament data"); return; }
+      if (!config) { renderSync("No tournament data"); return; }
       if (!allIds.length) { renderSync("No games added yet"); return; }
       // Show what we already have (cached finished games, earlier fetches) right away.
       if (!state.lastUpdate) { showGames(); renderAll(); }
@@ -1044,7 +1044,7 @@ try { ({ Chess } = await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dis
   renderAll();
   refresh();
   (function loop() {
-    const secs = Math.max(20, (CONFIG && CONFIG.refreshSeconds) || 300);
+    const secs = Math.max(MIN_REFRESH_S, config?.refreshSeconds || DEFAULT_REFRESH_S);
     setTimeout(() => { if (!document.hidden) refresh(); loop(); }, secs * 1000);
   })();
   setInterval(() => {
