@@ -38,12 +38,14 @@ on every refresh, so editing it is how you update the tournament.
   used for expected score and performance.
 - `rounds`: each round has a `name` and its `games`, as
   `{ "white": username, "black": username, "id": "" }`.
+- `rated`: whether the games should be rated on Lichess (default `true`).
+  The page flags a game that isn't set up that way.
 - `scoring`: points for a win, draw and loss (default 1, ½, 0).
 - `refreshSeconds`: how often to poll Lichess (default 300).
 
 Once a game starts on Lichess, put its 8-character ID (or its link, like
 `https://lichess.org/AbCd1234`) in `id`. The page flags a game whose players
-or colours don't match the schedule.
+or colours don't match the schedule, or that isn't rated as `rated` says.
 
 > **Only ever paste the first 8 characters.** A player who copies the link
 > from their own game gets a 12-character URL; the last 4 characters are a

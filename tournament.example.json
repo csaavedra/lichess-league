@@ -58,6 +58,7 @@
     ] }
   ],
 
+  "rated": true,
   "scoring": { "win": 1, "draw": 0.5, "loss": 0 },
   "refreshSeconds": 300
 }

@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   START_FEN, DAY_MS, fmtPts, plural, deadlineOf, fmtLeft, extractId, isPrivateId, summarize,
-  computeStandings, scheduleMismatch, playerGames, playerStats,
+  computeStandings, scheduleMismatch, ratedMismatch, playerGames, playerStats,
 } from "./lib.js";
 
 // players: [[username, seed, seedRating]] -> the page's configNames map.
@@ -19,7 +19,7 @@ function game(white, black, result, extra = {}) {
   const winner = { "1-0": "white", "0-1": "black" }[result];
   const side = (u, rating, ratingDiff) => ({ user: { id: u, name: u }, rating, ratingDiff });
   return summarize({
-    id: `game${String(nextId++).padStart(4, "0")}`, status, winner,
+    id: `game${String(nextId++).padStart(4, "0")}`, status, winner, rated: extra.rated ?? true,
     players: { white: side(white, extra.whiteRating ?? 1500, extra.whiteDiff), black: side(black, extra.blackRating ?? 1500, extra.blackDiff) },
     moves: extra.moves ?? "e4 e5 Nf3",
     lastMoveAt: extra.lastMoveAt ?? 1000, createdAt: 0, daysPerTurn: extra.daysPerTurn ?? 3,
@@ -209,6 +209,8 @@ test("summarize", () => {
   assert.equal(g.lastMoveAt, 5000);
   assert.equal(g.opening, "King's Knight Opening");
   assert.equal(g.white.username, "Anonymous");
+  assert.equal(g.rated, false);
+  assert.equal(summarize({ id: "Rated123", status: "started", rated: true }).rated, true);
 
   // A new game: no moves, no lastFen and no lastMoveAt yet.
   const fresh = summarize({ id: "Fresh123", status: "created", players: {}, createdAt: 1000 });
@@ -227,6 +229,14 @@ test("schedule checks: reversed colours and wrong players", () => {
   assert.equal(scheduleMismatch(slot, game("b", "a", "live")), "reversed");
   assert.equal(scheduleMismatch(slot, game("a", "c", "live")), "other");
   assert.equal(scheduleMismatch(slot, null), "");
+});
+
+test("rated checks: the game must be rated the way the tournament is", () => {
+  assert.equal(ratedMismatch(true, game("a", "b", "live")), false);
+  assert.equal(ratedMismatch(true, game("a", "b", "live", { rated: false })), true);
+  assert.equal(ratedMismatch(false, game("a", "b", "live", { rated: false })), false);
+  assert.equal(ratedMismatch(false, game("a", "b", "live")), true);
+  assert.equal(ratedMismatch(true, null), false);
 });
 
 test("extractId and the private token check", () => {

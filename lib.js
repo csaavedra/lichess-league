@@ -64,6 +64,7 @@ export function summarize(g) {
     createdAt: g.createdAt,
     opening: g.opening ? g.opening.name : "",
     daysPerTurn: g.daysPerTurn || null,
+    rated: !!g.rated,
   };
 }
 
@@ -127,6 +128,9 @@ export function scheduleMismatch(slot, g) {
   if (g.white.id === slot.black && g.black.id === slot.white) return "reversed";
   return "other";
 }
+
+// A game that isn't rated when the tournament is, or the other way round.
+export const ratedMismatch = (rated, g) => !!g && g.rated !== rated;
 
 // ---------- player stats ----------
 const expected = (me, opp) => 1 / (1 + Math.pow(10, (opp - me) / 400));

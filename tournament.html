@@ -313,7 +313,7 @@ footer { color: var(--muted); font-size: 13.5px; border-top: 1px solid var(--lin
 <script type="module">
 import {
   START_FEN, ONGOING, DAY_MS, DEFAULT_SCORING, fmtPts, plural, deadlineOf, fmtLeft, extractId, isPrivateId, summarize,
-  computeStandings, scheduleMismatch, playerGames, playerStats,
+  computeStandings, scheduleMismatch, ratedMismatch, playerGames, playerStats,
 } from "./lib.js";
 
 // chess.js is only used to replay the moves of a game. No engine is loaded anywhere on this page.
@@ -365,7 +365,7 @@ function tickDeadlines() {
 
 // ---------- config parsing ----------
 let config = null, configText = null;
-let rounds = [], allIds = [], roster = new Map(), scoring = DEFAULT_SCORING;
+let rounds = [], allIds = [], roster = new Map(), scoring = DEFAULT_SCORING, rated = true;
 const notices = { config: "", ids: "", schedule: "", fetch: "" };
 const liveGames = new Map(); // id -> latest export of a game not finished yet
 const notFound = new Set();
@@ -406,6 +406,7 @@ function applyConfig(cfg) {
     }])
   );
   scoring = { ...DEFAULT_SCORING, ...cfg.scoring };
+  rated = cfg.rated !== false;
 
   const title = cfg.title || "Correspondence round-robin";
   document.getElementById("title").textContent = title;
@@ -527,14 +528,14 @@ async function updateHistories() {
 
 // Finished games never change, so keep them in this browser and only ask
 // Lichess for games still in progress (or not seen yet).
-const CACHE_KEY = "tournament:finished-games:v1";
+const CACHE_KEY = "tournament:finished-games:v2";
 const finishedCache = (() => {
   try { return JSON.parse(localStorage.getItem(CACHE_KEY)) || {}; } catch { return {}; }
 })();
 function cacheFinished(g) {
   if (ONGOING.has(g.status)) return;
-  const { id, status, winner, players, moves, lastFen, lastMove, lastMoveAt, createdAt, opening, daysPerTurn } = g;
-  finishedCache[id] = { id, status, winner, players, moves, lastFen, lastMove, lastMoveAt, createdAt, opening, daysPerTurn };
+  const { id, rated, status, winner, players, moves, lastFen, lastMove, lastMoveAt, createdAt, opening, daysPerTurn } = g;
+  finishedCache[id] = { id, rated, status, winner, players, moves, lastFen, lastMove, lastMoveAt, createdAt, opening, daysPerTurn };
   try { localStorage.setItem(CACHE_KEY, JSON.stringify(finishedCache)); } catch { /* storage full or blocked */ }
 }
 
@@ -622,13 +623,16 @@ function currentRound() {
   return Math.max(0, rounds.findLastIndex((r) => r.ids.length));
 }
 
-// A game whose players or colours differ from its slot in the schedule.
+// A game whose players or colours differ from its slot in the schedule,
+// or that isn't rated the way the tournament is.
 function mismatchText(slot, g) {
+  const msgs = [];
   const kind = scheduleMismatch(slot, g);
-  if (!kind) return "";
   const want = `${nameOf(slot.white)} (white) against ${nameOf(slot.black)} (black)`;
-  if (kind === "reversed") return `Colours are reversed: the schedule has ${want}.`;
-  return `This is not the scheduled game: the schedule has ${want}.`;
+  if (kind === "reversed") msgs.push(`Colours are reversed: the schedule has ${want}.`);
+  else if (kind) msgs.push(`This is not the scheduled game: the schedule has ${want}.`);
+  if (ratedMismatch(rated, g)) msgs.push(rated ? "This game is unrated: the tournament is rated." : "This game is rated: the tournament is unrated.");
+  return msgs.join(" ");
 }
 
 function scheduleNotice() {
@@ -897,7 +901,7 @@ function renderPlayer() {
     tile("Points", fmtPts(st.pts), st.n ? `from ${plural(st.n, "finished game")}, ${pct}%` : "no finished games yet"),
     tile("Won · drawn · lost", `${st.w} · ${st.d} · ${st.l}`, st.live ? `${st.live} in progress` : "none in progress"),
     tile("Performance", st.perf != null ? st.perf : "—", st.avgOpp != null ? `average opponent ${st.avgOpp} (seed ratings)` : "needs a finished game"),
-    tile("Rating change", st.diffN ? signed(st.diff) : "—", startRating != null ? `${startRating} at the first game` : "no rated games yet", st.diff > 0 ? "up" : ""),
+    rated ? tile("Rating change", st.diffN ? signed(st.diff) : "—", startRating != null ? `${startRating} at the first game` : "no rated games yet", st.diff > 0 ? "up" : "") : "",
     tile("Against expectation", st.expN ? signed(st.frac - st.exp, 1) : "—", st.expN ? `expected ${st.exp.toFixed(1)} from seed ratings` : "needs a finished game", st.frac - st.exp > 0.05 && st.expN ? "up" : ""),
   ].join("");
 
@@ -942,7 +946,7 @@ function renderPlayer() {
         <thead><tr><th>Round</th><th>Opponent</th><th class="r">Result</th><th class="num">Rating</th><th class="num">Moves</th><th>Notes</th></tr></thead>
         <tbody>${rowsHTML}</tbody></table></div>` : '<p class="facts">No games yet.</p>'}
     </div>
-    <p class="facts fine">Ratings next to names are Lichess correspondence ratings at the start of each game. Performance and expected score use the seed ratings, each player's fixed rating for the tournament, because many Lichess correspondence ratings here are still provisional. Performance is Lichess's tournament performance over finished games: the average of each opponent's rating, plus 500 for a win and minus 500 for a loss. Rating change adds up what Lichess awarded for the finished games in this tournament.</p>
+    <p class="facts fine">Ratings next to names are Lichess correspondence ratings at the start of each game. Performance and expected score use the seed ratings, each player's fixed rating for the tournament, because many Lichess correspondence ratings here are still provisional. Performance is Lichess's tournament performance over finished games: the average of each opponent's rating, plus 500 for a win and minus 500 for a loss.${rated ? " Rating change adds up what Lichess awarded for the finished games in this tournament." : ""}</p>
   </div>`;
 }
 
