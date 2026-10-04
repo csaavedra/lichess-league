@@ -105,7 +105,8 @@ Colours, fonts and radii are CSS variables in `:root`, with a dark-mode set.
 The page loads an optional `theme/theme.css` after its own styles to
 override them, and has an empty `.brand` slot in the header for a logo. The
 `theme/` folder is git-ignored. Without it the page uses its default look
-(and logs one 404).
+(and logs one 404). The default fonts come from Google Fonts, which the page
+only loads when no theme replaces them.
 
 ## Development
 
