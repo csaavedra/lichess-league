@@ -1,0 +1,1137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Correspondence round-robin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Spectral:wght@500;600;700&display=swap" rel="stylesheet">
+<!-- chess.js is only used to replay the moves of a game. No engine is loaded anywhere on this page. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+
+<!--
+  The players, rounds and games live in tournament.json next to this file.
+  Edit that file to update the tournament; the page re-reads it on every refresh.
+
+  Each round lists its games as { "white": user, "black": user, "id": "" }. Once a
+  game starts, put its 8-character Lichess ID (or a link like
+  "https://lichess.org/AbCd1234") in "id".
+  IMPORTANT: a player who copies the link from their own game gets a 12-character
+  URL (e.g. lichess.org/AbCd1234WxYz). The last 4 characters are a private token
+  that lets anyone make moves for that player. Only ever paste the first 8.
+-->
+
+<style>
+:root {
+  --bg: #eef1ec;
+  --surface: #ffffff;
+  --ink: #18201d;
+  --muted: #5b6661;
+  --line: #d3d9d3;
+  --sq-light: #e6e9d8;
+  --sq-dark: #5e8a73;
+  --last: rgba(222, 184, 60, 0.55);
+  --accent: #946a12;
+  --accent-soft: #f3e7c6;
+  --live: #2e7d5b;
+  --self: #e3e8e2;
+  --serif: "Spectral", Georgia, "Times New Roman", serif;
+  --sans: "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141917;
+    --surface: #1c2320;
+    --ink: #e7ece8;
+    --muted: #97a39d;
+    --line: #2e3833;
+    --sq-light: #c9cfb8;
+    --sq-dark: #4b735f;
+    --last: rgba(222, 184, 60, 0.6);
+    --accent: #d9a93e;
+    --accent-soft: #3a3220;
+    --live: #5cc08f;
+    --self: #252e2a;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 16px/1.5 var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 1180px; margin: 0 auto; padding: 32px 20px 64px; }
+
+/* Header */
+header.top {
+  display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between;
+  gap: 16px; margin-bottom: 28px;
+}
+h1 {
+  font: 700 clamp(28px, 4.5vw, 44px)/1.05 var(--serif);
+  margin: 0; letter-spacing: -0.01em;
+}
+.subtitle { margin: 6px 0 0; color: var(--muted); font-size: 17px; }
+.sync { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 14px; }
+.sync .dot {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--live); display: inline-block;
+  margin-right: 6px; vertical-align: 1px;
+}
+.sync.stale .dot { background: var(--accent); }
+button {
+  font: 600 14px/1 var(--sans); color: var(--ink); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 6px; padding: 9px 14px; cursor: pointer;
+}
+button:hover { border-color: var(--muted); }
+button:focus-visible, a:focus-visible, .game:focus-visible, .move:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+
+.notice {
+  background: var(--accent-soft); border-left: 3px solid var(--accent);
+  padding: 12px 16px; margin: 0 0 24px; border-radius: 0 6px 6px 0; font-size: 15px;
+}
+.notice[hidden] { display: none; }
+
+h2 { font: 600 22px/1.2 var(--serif); margin: 0 0 14px; }
+section { margin-bottom: 40px; }
+
+/* Crosstable */
+.table-scroll { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+table.cross { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+.cross th, .cross td { padding: 10px 8px; text-align: center; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.cross tr:last-child td { border-bottom: 0; }
+.cross thead th { font-size: 13px; font-weight: 600; color: var(--muted); background: transparent; }
+.cross td.rank { color: var(--muted); width: 36px; }
+.cross td.name { text-align: left; padding-left: 4px; min-width: 160px; }
+.cross td.name strong { font: 600 17px/1.2 var(--serif); }
+.cross td.name small { display: block; color: var(--muted); font-size: 12.5px; }
+.cross td.res { width: 44px; font-weight: 600; }
+.cross td.self { background: var(--self); }
+.cross td.res .live { color: var(--live); font-size: 12px; font-weight: 600; }
+.cross td.res .l { color: var(--muted); font-weight: 500; }
+.cross td.pts { font: 700 19px/1 var(--serif); width: 64px; }
+.cross td.sb, .cross td.gp { color: var(--muted); width: 56px; font-size: 14px; }
+.cross tbody tr:first-child td.pts { color: var(--accent); }
+.legend { color: var(--muted); font-size: 13px; margin: 8px 2px 0; }
+
+/* Round tabs */
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; }
+.tabs button { border-radius: 999px; padding: 8px 14px; font-weight: 500; }
+.tabs button[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); font-weight: 600; }
+.tabs button .count { opacity: 0.65; font-weight: 500; margin-left: 4px; }
+.round-meta { color: var(--muted); font-size: 14px; margin: -6px 0 16px; }
+
+/* Game cards */
+.games { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 18px; }
+.game {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+  padding: 12px; cursor: pointer;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.game:hover { border-color: var(--muted); }
+.side { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 15px; min-height: 22px; }
+.chip { display: inline-block; width: 12px; height: 12px; border-radius: 2px; border: 1px solid var(--muted); flex: none; vertical-align: -1px; }
+.chip.w { background: #fafaf5; }
+.chip.b { background: #222; }
+.side .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.side .rt { color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; }
+.side .sc { font-variant-numeric: tabular-nums; }
+.side.to-move .nm::after {
+  content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--accent); margin-left: 7px; vertical-align: 2px;
+}
+.side.lost { color: var(--muted); font-weight: 500; }
+.status { font-size: 13.5px; color: var(--muted); line-height: 1.4; }
+.status b { color: var(--ink); font-weight: 600; }
+.status.warn { color: var(--accent); font-weight: 600; }
+.game.pending { cursor: default; }
+.game.pending:hover { border-color: var(--line); }
+.game.pending .board { opacity: 0.45; filter: saturate(0.6); }
+
+/* Board */
+.board {
+  display: grid; grid-template-columns: repeat(8, 1fr); aspect-ratio: 1;
+  width: 100%; border-radius: 3px; overflow: hidden; user-select: none;
+}
+.sq { position: relative; background: var(--sq-light); }
+.sq.d { background: var(--sq-dark); }
+.sq.hl::before { content: ""; position: absolute; inset: 0; background: var(--last); }
+.sq img { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+.empty {
+  background: var(--surface); border: 1px dashed var(--line); border-radius: 8px;
+  padding: 28px; color: var(--muted); max-width: 60ch;
+}
+.empty code { background: var(--self); padding: 1px 5px; border-radius: 4px; font-size: 14px; }
+
+/* Game dialog */
+dialog {
+  border: 1px solid var(--line); border-radius: 10px; padding: 0; background: var(--surface); color: var(--ink);
+  width: min(960px, 96vw); max-height: 94vh;
+}
+dialog::backdrop { background: rgba(10, 14, 12, 0.6); }
+.dlg { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 24px; padding: 22px; }
+.dlg .head { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.dlg h3 { font: 600 22px/1.25 var(--serif); margin: 0; }
+.dlg .head p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+.dlg .controls { display: flex; gap: 6px; margin-top: 12px; justify-content: center; }
+.dlg .controls button { min-width: 48px; font-size: 16px; }
+.dlg .keys { margin: 8px 0 0; text-align: center; color: var(--muted); font-size: 12.5px; }
+@media (hover: none) { .dlg .keys { display: none; } }
+.moves {
+  max-height: min(60vh, 520px); overflow-y: auto; border: 1px solid var(--line); border-radius: 6px;
+  display: grid; grid-template-columns: 44px 1fr 1fr; align-content: start; font-variant-numeric: tabular-nums;
+}
+.moves .no { color: var(--muted); padding: 5px 8px; background: var(--bg); font-size: 14px; }
+.move { padding: 5px 10px; cursor: pointer; border: 0; background: none; text-align: left; font: 500 15px/1.4 var(--sans); color: var(--ink); border-radius: 0; }
+.move:hover { background: var(--self); }
+.move.cur { background: var(--accent-soft); font-weight: 700; }
+.dlg .side-panel { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.dlg .opening { font-size: 14px; color: var(--muted); }
+.dlg a { color: var(--accent); font-weight: 600; }
+.dlg .head .actions { display: flex; gap: 6px; flex: none; }
+
+/* Player view */
+.cross .pname { all: unset; cursor: pointer; display: block; border-radius: 3px; }
+.cross .pname:hover strong { text-decoration: underline; text-underline-offset: 3px; }
+.cross .pname:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.dlg.pdlg { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.tile { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+.tile .k { font-size: 12.5px; color: var(--muted); font-weight: 600; }
+.tile .v { font: 700 26px/1.15 var(--serif); font-variant-numeric: tabular-nums; margin: 2px 0; }
+.tile .s { font-size: 12.5px; color: var(--muted); }
+.tile .v.up { color: var(--live); }
+.pdlg .facts { margin: 0; font-size: 14px; color: var(--muted); line-height: 1.6; }
+.pdlg .facts b { color: var(--ink); font-weight: 600; }
+.pdlg h4 { font: 600 17px/1.2 var(--serif); margin: 0 0 8px; }
+table.pgames { border-collapse: collapse; width: 100%; font-size: 14.5px; font-variant-numeric: tabular-nums; }
+.pgames th, .pgames td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.pgames th { font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.pgames tr:last-child td { border-bottom: 0; }
+.pgames tbody tr { cursor: pointer; }
+.pgames tbody tr:hover td, .pgames tbody tr:focus-visible td { background: var(--self); }
+.pgames tbody tr:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.pgames td.opp { font-weight: 600; }
+.pgames .chip, .upcoming .chip { margin-right: 8px; }
+.pgames td.opp .rt, .pgames td.note { color: var(--muted); font-weight: 500; }
+.pgames td.note { white-space: normal; min-width: 160px; }
+.pgames td.r { font-weight: 700; text-align: center; }
+.pgames td.r .live { color: var(--live); font-weight: 600; font-size: 13px; }
+.pgames .num { text-align: right; }
+.upcoming { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px 16px; font-size: 14px; color: var(--muted); }
+.upcoming b { color: var(--ink); font-weight: 600; }
+
+footer { color: var(--muted); font-size: 13.5px; border-top: 1px solid var(--line); padding-top: 16px; }
+
+@media (max-width: 720px) {
+  .wrap { padding: 20px 14px 48px; }
+  .dlg { grid-template-columns: 1fr; padding: 16px; }
+  .moves { max-height: 34vh; }
+  .games { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .game { transition: border-color 0.15s; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1 id="title"></h1>
+      <p class="subtitle" id="subtitle"></p>
+    </div>
+    <div class="sync" id="sync">
+      <span id="sync-text"><span class="dot"></span>Loading games…</span>
+      <button id="refresh" type="button">Refresh now</button>
+    </div>
+  </header>
+
+  <p class="notice" id="notice" hidden></p>
+
+  <section aria-labelledby="standings-h">
+    <h2 id="standings-h">Standings</h2>
+    <div class="table-scroll"><table class="cross" id="cross"></table></div>
+    <p class="legend">Numbered columns are opponents in standings order. A green dot marks a game in progress. Ties on points are broken by TW (wins against the other players on the same points, shown only when tied), then SB (Sonneborn–Berger), then wins, then seed. Select a player's name to see their tournament performance.</p>
+  </section>
+
+  <section aria-labelledby="games-h">
+    <h2 id="games-h">Games</h2>
+    <div class="tabs" role="tablist" id="tabs"></div>
+    <p class="round-meta" id="round-meta"></p>
+    <div class="games" id="games"></div>
+  </section>
+
+  <footer>This page shows positions and moves only. There is no engine or evaluation anywhere on it, by design. Game data comes from Lichess and refreshes automatically.</footer>
+</div>
+
+<dialog id="dlg" aria-labelledby="dlg-title"></dialog>
+
+<script>
+(() => {
+  const PIECE_URL = "https://lichess1.org/assets/piece/cburnett/";
+  const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+  const ONGOING = new Set(["created", "started"]);
+  const VOID = new Set(["aborted", "noStart"]);
+  const REASONS = {
+    mate: "checkmate", resign: "resignation", outoftime: "on time", timeout: "opponent left",
+    stalemate: "stalemate", draw: "draw", cheat: "fair-play forfeit", variantEnd: "game over",
+  };
+
+  const state = {
+    games: new Map(),     // id -> summary
+    round: null,
+    lastUpdate: null,
+    pausedUntil: 0,
+    open: null,           // game view: { id, positions, ply, back }
+    player: null,         // player view: player id
+  };
+
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const fmtPts = (n) => {
+    const whole = Math.floor(n), frac = n - whole;
+    if (Math.abs(frac - 0.5) < 1e-9) return (whole ? whole : "") + "½";
+    return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0+$/, "");
+  };
+  const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+  function ago(ts) {
+    if (!ts) return "";
+    const s = Math.round((ts - Date.now()) / 1000);
+    const abs = Math.abs(s);
+    if (abs < 60) return rtf.format(s, "second");
+    if (abs < 3600) return rtf.format(Math.round(s / 60), "minute");
+    if (abs < 86400) return rtf.format(Math.round(s / 3600), "hour");
+    return rtf.format(Math.round(s / 86400), "day");
+  }
+
+  // ---------- config parsing ----------
+  // "https://lichess.org/AbCd1234WxYz?x" -> "AbCd1234WxYz"
+  const stripLink = (raw) => String(raw || "").trim().replace(/^https?:\/\/[^/]+\//i, "").split(/[/?#]/)[0];
+  function extractId(raw) {
+    const id = stripLink(raw).slice(0, 8);
+    return /^[A-Za-z0-9]{8}$/.test(id) ? id : null;
+  }
+  let CONFIG = null, configText = null;
+  let rounds = [], allIds = [], configNames = new Map(), sc = { win: 1, draw: 0.5, loss: 0 };
+  const notices = { config: "", ids: "", schedule: "", fetch: "" };
+  const liveGames = new Map(); // id -> latest export of a game not finished yet
+  const notFound = new Set();
+
+  async function loadConfig() {
+    const res = await fetch("tournament.json", { cache: "no-cache" });
+    if (!res.ok) throw new Error(`The server answered with status ${res.status}.`);
+    const text = await res.text();
+    if (text === configText) return false;
+    let cfg;
+    try { cfg = JSON.parse(text); }
+    catch (err) { throw new Error(`It is not valid JSON: ${err.message}`); }
+    configText = text;
+    applyConfig(cfg);
+    return true;
+  }
+
+  function applyConfig(cfg) {
+    CONFIG = cfg;
+    const cfgRounds = Array.isArray(cfg.rounds) ? cfg.rounds : [];
+    // Each game is a scheduled pairing { white, black, id }; the id stays
+    // empty until the game is created on Lichess.
+    const user = (u) => String(u || "").trim().toLowerCase();
+    rounds = cfgRounds.map((r, i) => {
+      const slots = (r.games || []).map((x) => {
+        const raw = String(x.id || "").trim();
+        return { white: user(x.white), black: user(x.black), raw, id: raw ? extractId(raw) : null };
+      });
+      return { name: r.name || `Round ${i + 1}`, slots, ids: slots.map((x) => x.id).filter(Boolean) };
+    });
+    allIds = [...new Set(rounds.flatMap((r) => r.ids))];
+    const num = (n) => (Number.isFinite(n) ? n : null);
+    configNames = new Map(
+      (cfg.players || []).filter((p) => p.username).map((p) => [p.username.toLowerCase(), {
+        username: p.username, name: p.name || "",
+        seed: num(p.seed), seedRating: num(p.seedRating), seedBasis: p.seedBasis || "",
+      }])
+    );
+    sc = Object.assign({ win: 1, draw: 0.5, loss: 0 }, cfg.scoring || {});
+
+    const title = cfg.title || "Correspondence round-robin";
+    document.getElementById("title").textContent = title;
+    document.getElementById("subtitle").textContent = cfg.subtitle || "";
+    document.title = title;
+
+    if (state.round === null || state.round >= rounds.length) {
+      let lastWithGames = -1;
+      rounds.forEach((r, i) => { if (r.ids.length) lastWithGames = i; });
+      state.round = Math.max(0, lastWithGames);
+    }
+
+    const allSlots = rounds.flatMap((r) => r.slots);
+    const badIds = allSlots.filter((x) => x.raw && !x.id).map((x) => x.raw);
+    const privateIds = allSlots.map((x) => x.raw).filter((raw) => /^[A-Za-z0-9]{12}$/.test(stripLink(raw)));
+    const unknown = [...new Set(allSlots.flatMap((x) => [x.white, x.black]).filter((u) => !configNames.has(u)))];
+    const warnings = [];
+    if (unknown.length) warnings.push(`These usernames appear in the schedule in tournament.json but not in its players list: ${unknown.map((u) => u || "(empty)").join(", ")}.`);
+    if (privateIds.length) warnings.push(`Shorten these to their first 8 characters in tournament.json: ${privateIds.join(", ")}. The extra 4 characters are a player's private token that lets anyone move for them, and should never be shared.`);
+    if (badIds.length) warnings.push(`These entries in tournament.json are not valid Lichess game IDs and were skipped: ${badIds.join(", ")}.`);
+    notices.ids = warnings.join(" ");
+  }
+
+  // ---------- data ----------
+  // One game at a time through the single-game export. The bulk endpoint
+  // (/api/games/export/_ids) allows only 2 concurrent requests per IP address,
+  // and Lichess can keep that slot taken long after a request ends, which
+  // blocks the page for everyone on the same network.
+  const EXPORT_PARAMS = "moves=true&lastFen=true&opening=true&evals=false&clocks=false&accuracy=false&literate=false";
+  async function fetchGame(id) {
+    const res = await fetch(`https://lichess.org/game/export/${id}?${EXPORT_PARAMS}`, { headers: { Accept: "application/json" } });
+    if (res.status === 404) return null;
+    if (res.status === 429) { const e = new Error("rate"); e.rate = true; throw e; }
+    if (!res.ok) throw new Error(`Lichess answered with status ${res.status}.`);
+    return res.json();
+  }
+
+  // The export API leaves out the last few moves of games in progress (an
+  // anti-cheat delay), although lastFen is current. The game stream has the
+  // full history, so read it until it reaches the exported position, then stop.
+  const histories = new Map(); // id -> { key, moves, positions }
+
+  async function fetchHistory(g) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 15000);
+    const target = fenKey(g.fen);
+    const list = [];
+    try {
+      const res = await fetch(`https://lichess.org/api/stream/game/${g.id}`, { signal: ctrl.signal, headers: { Accept: "application/x-ndjson" } });
+      if (res.status === 429) { const e = new Error("rate"); e.rate = true; throw e; }
+      if (!res.ok || !res.body) return null;
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      read: for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let nl;
+        while ((nl = buf.indexOf("\n")) >= 0) {
+          const line = buf.slice(0, nl).trim();
+          buf = buf.slice(nl + 1);
+          if (!line) continue;
+          const msg = JSON.parse(line);
+          if (!msg.fen || msg.id) continue; // the first line is the game itself
+          list.push(msg);
+          if (fenKey(msg.fen) === target && (msg.lm || null) === g.lastUci) break read;
+        }
+      }
+    } catch (err) {
+      if (err.rate) throw err;
+      return null;
+    } finally {
+      clearTimeout(timer);
+      ctrl.abort();
+    }
+    if (!list.length || fenKey(list[list.length - 1].fen) !== target) return null;
+    return historyFromStream(list);
+  }
+
+  function fenKey(fen) { return String(fen || "").split(" ").slice(0, 2).join(" "); }
+
+  function playUci(c, uci) {
+    const from = uci.slice(0, 2), to = uci.slice(2, 4), promotion = uci[4];
+    let m = c.move({ from, to, promotion });
+    // Lichess may write castling as king-takes-rook (e1h1).
+    if (!m && /^e[18][ah][18]$/.test(uci)) m = c.move({ from, to: (to[0] === "h" ? "g" : "c") + to[1] });
+    return m;
+  }
+
+  function historyFromStream(list) {
+    const positions = list.map((m) => ({ fen: m.fen, last: m.lm ? [m.lm.slice(0, 2), m.lm.slice(2, 4)] : null }));
+    const c = new Chess(list[0].fen);
+    const moves = list.slice(1).map((m) => (playUci(c, m.lm || "") || { san: m.lm }).san);
+    return { moves, positions };
+  }
+
+  // Use the streamed history when it is ahead of the exported move list.
+  function withHistory(g) {
+    const h = histories.get(g.id);
+    if (h && h.moves.length > g.moves.length) { g.moves = h.moves; g.positions = h.positions; }
+    return g;
+  }
+
+  async function updateHistories() {
+    for (const g of state.games.values()) {
+      if (g.result || !g.lastUci) continue;
+      const h = histories.get(g.id);
+      if (h && h.key === g.fen) continue;
+      const fresh = await fetchHistory(g);
+      if (!fresh) continue;
+      histories.set(g.id, { key: g.fen, ...fresh });
+      withHistory(g);
+      renderAll();
+    }
+  }
+
+  // Finished games never change, so keep them in this browser and only ask
+  // Lichess for games still in progress (or not seen yet).
+  const CACHE_KEY = "tournament:finished-games:v1";
+  const finishedCache = (() => {
+    try { return JSON.parse(localStorage.getItem(CACHE_KEY)) || {}; } catch { return {}; }
+  })();
+  function cacheFinished(g) {
+    if (ONGOING.has(g.status)) return;
+    const { id, status, winner, players, moves, lastFen, lastMove, lastMoveAt, createdAt, opening, daysPerTurn } = g;
+    finishedCache[id] = { id, status, winner, players, moves, lastFen, lastMove, lastMoveAt, createdAt, opening, daysPerTurn };
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify(finishedCache)); } catch { /* storage full or blocked */ }
+  }
+
+  function playerOf(p) {
+    if (p && p.user) return { id: p.user.id || p.user.name.toLowerCase(), username: p.user.name, rating: p.rating ?? null, ratingDiff: p.ratingDiff ?? null, provisional: !!p.provisional };
+    return { id: "?anon", username: "Anonymous", rating: null, ratingDiff: null, provisional: false };
+  }
+
+  function summarize(g) {
+    const white = playerOf(g.players && g.players.white);
+    const black = playerOf(g.players && g.players.black);
+    const moves = (g.moves || "").split(" ").filter(Boolean);
+    const fen = g.lastFen || START_FEN;
+    let result = null;
+    if (VOID.has(g.status)) result = "void";
+    else if (!ONGOING.has(g.status)) result = g.winner === "white" ? "1-0" : g.winner === "black" ? "0-1" : "½-½";
+    let last = null;
+    if (g.lastMove && g.lastMove.length >= 4) last = [g.lastMove.slice(0, 2), g.lastMove.slice(2, 4)];
+    return {
+      id: g.id, white, black, moves, positions: null, fen, last, lastUci: g.lastMove || null, result, status: g.status,
+      turn: fen.split(" ")[1] === "b" ? "black" : "white",
+      lastMoveAt: g.lastMoveAt || g.createdAt,
+      createdAt: g.createdAt,
+      opening: g.opening ? g.opening.name : "",
+      daysPerTurn: g.daysPerTurn || null,
+    };
+  }
+
+  const seedOf = (id) => (configNames.get(id) || {}).seed ?? null;
+  const seedRatingOf = (id) => (configNames.get(id) || {}).seedRating ?? null;
+  const ordinal = (n) => n + ((n % 100 >= 11 && n % 100 <= 13) ? "th" : ["th", "st", "nd", "rd"][n % 10] || "th");
+  const plainPlayer = (id) => ({ id, username: (configNames.get(id) || {}).username || id });
+
+  function displayName(p) {
+    return (configNames.get(p.id) || {}).name || p.username;
+  }
+
+  // ---------- standings ----------
+  function computeStandings() {
+    const P = new Map();
+    const ensure = (id, username, fromGame) => {
+      if (!P.has(id)) P.set(id, { id, username, pts: 0, played: 0, wins: 0, cells: new Map(), sb: 0 });
+      const p = P.get(id);
+      if (fromGame) p.username = username; // Lichess has the correct capitalisation
+      return p;
+    };
+    configNames.forEach((v, k) => ensure(k, v.username));
+    const cell = (a, b) => { if (!a.cells.has(b.id)) a.cells.set(b.id, []); return a.cells.get(b.id); };
+
+    rounds.forEach((r) => r.ids.forEach((id) => {
+      const g = state.games.get(id);
+      if (!g) return;
+      const w = ensure(g.white.id, g.white.username, true);
+      const b = ensure(g.black.id, g.black.username, true);
+      if (g.result === "void") return;
+      if (!g.result) { cell(w, b).push({ live: true }); cell(b, w).push({ live: true }); return; }
+      const [ws, bs] = g.result === "1-0" ? [sc.win, sc.loss] : g.result === "0-1" ? [sc.loss, sc.win] : [sc.draw, sc.draw];
+      w.pts += ws; b.pts += bs; w.played++; b.played++;
+      if (g.result === "1-0") w.wins++;
+      if (g.result === "0-1") b.wins++;
+      cell(w, b).push({ s: ws, kind: g.result === "½-½" ? "d" : ws > bs ? "w" : "l" });
+      cell(b, w).push({ s: bs, kind: g.result === "½-½" ? "d" : bs > ws ? "w" : "l" });
+    }));
+
+    P.forEach((p) => {
+      p.cells.forEach((list, oppId) => {
+        const opp = P.get(oppId);
+        list.forEach((c) => { if (!c.live && sc.win) p.sb += (c.s / sc.win) * opp.pts; });
+      });
+    });
+
+    // Tiebreaks, in order: wins against the players tied on points, then
+    // Sonneborn–Berger, then total wins.
+    const players = [...P.values()].filter((p) => p.id !== "?anon");
+    players.forEach((p) => {
+      const tied = players.filter((o) => o !== p && Math.abs(o.pts - p.pts) < 1e-9);
+      p.tied = tied.length > 0;
+      p.tiedWins = tied.reduce((n, o) => n + (p.cells.get(o.id) || []).filter((c) => c.kind === "w").length, 0);
+    });
+    return players.sort((a, b) =>
+      b.pts - a.pts || b.tiedWins - a.tiedWins || b.sb - a.sb || b.wins - a.wins ||
+      (seedOf(a.id) ?? Infinity) - (seedOf(b.id) ?? Infinity) || displayName(a).localeCompare(displayName(b))
+    );
+  }
+
+  // ---------- rendering ----------
+  function boardHTML(fen, last) {
+    const rows = (fen || START_FEN).split(" ")[0].split("/");
+    let html = '<div class="board" aria-hidden="true">';
+    rows.forEach((row, r) => {
+      let f = 0;
+      for (const ch of row) {
+        if (/\d/.test(ch)) {
+          for (let k = 0; k < +ch; k++, f++) html += sq(r, f, null, last);
+        } else { html += sq(r, f, ch, last); f++; }
+      }
+    });
+    return html + "</div>";
+  }
+  function sq(r, f, piece, last) {
+    const name = "abcdefgh"[f] + (8 - r);
+    const dark = (r + f) % 2 === 1;
+    const hl = last && (last[0] === name || last[1] === name);
+    let inner = "";
+    if (piece) {
+      const color = piece === piece.toUpperCase() ? "w" : "b";
+      inner = `<img src="${PIECE_URL}${color}${piece.toUpperCase()}.svg" alt="" draggable="false">`;
+    }
+    return `<div class="sq${dark ? " d" : ""}${hl ? " hl" : ""}">${inner}</div>`;
+  }
+
+  function renderStandings() {
+    const rows = computeStandings();
+    const t = document.getElementById("cross");
+    if (!rows.length) {
+      t.innerHTML = '<tbody><tr><td class="name" style="padding:18px">Players appear here once you add usernames or game IDs to tournament.json.</td></tr></tbody>';
+      return;
+    }
+    let html = '<thead><tr><th>#</th><th style="text-align:left;padding-left:4px">Player</th><th title="Starting seed">Seed</th>';
+    rows.forEach((_, i) => { html += `<th>${i + 1}</th>`; });
+    html += '<th>Pts</th><th title="Wins against the players tied on points">TW</th><th title="Sonneborn–Berger">SB</th><th>Wins</th><th>Played</th></tr></thead><tbody>';
+    rows.forEach((p, i) => {
+      const nm = displayName(p);
+      const sub = nm !== p.username ? `<small>${esc(p.username)}</small>` : "";
+      html += `<tr><td class="rank">${i + 1}</td><td class="name"><button type="button" class="pname" data-player="${esc(p.id)}" aria-label="${esc(nm)}, show performance"><strong>${esc(nm)}</strong>${sub}</button></td><td class="sb">${seedOf(p.id) ?? ""}</td>`;
+      rows.forEach((o) => {
+        if (o.id === p.id) { html += '<td class="res self"></td>'; return; }
+        const list = p.cells.get(o.id) || [];
+        const parts = list.map((c) => c.live
+          ? '<span class="live" title="In progress">●</span>'
+          : `<span class="${c.kind}">${c.kind === "w" ? "1" : c.kind === "d" ? "½" : "0"}</span>`);
+        html += `<td class="res">${parts.join(" ")}</td>`;
+      });
+      html += `<td class="pts">${fmtPts(p.pts) || "0"}</td><td class="sb">${p.tied ? p.tiedWins : ""}</td><td class="sb">${fmtPts(Math.round(p.sb * 100) / 100) || "0"}</td><td class="gp">${p.wins}</td><td class="gp">${p.played}</td></tr>`;
+    });
+    t.innerHTML = html + "</tbody>";
+  }
+
+  function roundStats(r) {
+    let done = 0, live = 0;
+    r.ids.forEach((id) => {
+      const g = state.games.get(id);
+      if (!g) return;
+      if (g.result) done++; else live++;
+    });
+    return { done, live, total: r.slots.length, waiting: r.slots.filter((x) => !x.id).length };
+  }
+
+  // A game whose players or colours differ from its slot in the schedule.
+  function scheduleMismatch(slot, g) {
+    if (!g) return "";
+    if (g.white.id === slot.white && g.black.id === slot.black) return "";
+    const want = `${displayName(plainPlayer(slot.white))} (white) against ${displayName(plainPlayer(slot.black))} (black)`;
+    if (g.white.id === slot.black && g.black.id === slot.white) return `Colours are reversed: the schedule has ${want}.`;
+    return `This is not the scheduled game: the schedule has ${want}.`;
+  }
+
+  function scheduleNotice() {
+    const issues = [];
+    rounds.forEach((r) => r.slots.forEach((slot) => {
+      const msg = scheduleMismatch(slot, slot.id && state.games.get(slot.id));
+      if (msg) issues.push(`${r.name}, game ${slot.id}: ${msg}`);
+    }));
+    return issues.join(" ");
+  }
+
+  function renderTabs() {
+    const el = document.getElementById("tabs");
+    el.innerHTML = rounds.map((r, i) => {
+      const st = roundStats(r);
+      const count = r.slots.length ? `<span class="count">${st.done}/${st.total}</span>` : "";
+      return `<button type="button" role="tab" aria-selected="${i === state.round}" data-r="${i}">${esc(r.name)}${count}</button>`;
+    }).join("");
+  }
+
+  // The export gives each player's rating at the start of the game.
+  function ratingHTML(p) {
+    if (p.rating == null) return "";
+    return ` <span class="rt">(${p.rating}${p.provisional ? "?" : ""})</span>`;
+  }
+
+  function sideHTML(p, color, g) {
+    const toMove = !g.result && g.turn === color;
+    const lost = g.result && ((color === "white" && g.result === "0-1") || (color === "black" && g.result === "1-0"));
+    let score = "";
+    if (g.result && g.result !== "void") {
+      score = g.result === "½-½" ? "½" : (color === "white") === (g.result === "1-0") ? "1" : "0";
+    }
+    return `<div class="side${toMove ? " to-move" : ""}${lost ? " lost" : ""}"><span class="chip ${color[0]}"></span><span class="nm">${esc(displayName(p))}${ratingHTML(p)}</span><span class="sc">${score}</span></div>`;
+  }
+
+  function plainSideHTML(id, color) {
+    return `<div class="side"><span class="chip ${color[0]}"></span><span class="nm">${esc(displayName(plainPlayer(id)))}</span></div>`;
+  }
+
+  function statusText(g) {
+    if (g.result === "void") return "Aborted. This game does not count.";
+    const moveNo = Math.ceil(g.moves.length / 2) || 0;
+    if (g.result) {
+      const why = REASONS[g.status] || "finished";
+      return `<b>${g.result}</b> by ${why}, ${moveNo} move${moveNo === 1 ? "" : "s"}`;
+    }
+    if (!g.moves.length) return `<b>Not started.</b> White to make the first move.`;
+    const who = displayName(g.turn === "white" ? g.white : g.black);
+    return `<b>${esc(who)} to move</b>, move ${g.turn === "white" ? moveNo + 1 : moveNo}<br>Last move ${ago(g.lastMoveAt)}`;
+  }
+
+  function renderGames() {
+    const r = rounds[state.round];
+    const el = document.getElementById("games");
+    const meta = document.getElementById("round-meta");
+    if (!r) { el.innerHTML = ""; meta.textContent = ""; return; }
+    if (!r.slots.length) {
+      meta.textContent = "";
+      el.innerHTML = `<div class="empty">No games added for ${esc(r.name)} yet. Add them to this round in tournament.json, for example <code>{ "white": "user1", "black": "user2", "id": "AbCd1234" }</code>.</div>`;
+      return;
+    }
+    const st = roundStats(r);
+    meta.textContent = `${st.done} of ${st.total} games finished` + (st.live ? `, ${st.live} in progress` : "") +
+      (st.waiting ? `, ${st.waiting} not started yet` : "");
+    el.innerHTML = r.slots.map((slot) => {
+      const g = slot.id && state.games.get(slot.id);
+      if (!g) {
+        let status = "<b>Not started yet.</b>";
+        if (slot.id) status = `Game <b>${esc(slot.id)}</b> ${notFound.has(slot.id) ? "was not found on Lichess. Check the ID." : "is loading…"}`;
+        return `<div class="game pending" aria-disabled="true">
+          ${plainSideHTML(slot.black, "black")}
+          ${boardHTML(START_FEN, null)}
+          ${plainSideHTML(slot.white, "white")}
+          <div class="status">${status}</div>
+        </div>`;
+      }
+      const mismatch = scheduleMismatch(slot, g);
+      return `<div class="game" role="button" tabindex="0" data-id="${esc(g.id)}" aria-label="${esc(displayName(g.white))} against ${esc(displayName(g.black))}, open game">
+        ${sideHTML(g.black, "black", g)}
+        ${boardHTML(g.fen, g.last)}
+        ${sideHTML(g.white, "white", g)}
+        <div class="status">${statusText(g)}</div>
+        ${mismatch ? `<div class="status warn">${esc(mismatch)}</div>` : ""}
+      </div>`;
+    }).join("");
+  }
+
+  function renderSync(msg) {
+    const el = document.getElementById("sync");
+    const txt = document.getElementById("sync-text");
+    if (msg) { el.classList.add("stale"); txt.innerHTML = `<span class="dot"></span>${esc(msg)}`; return; }
+    el.classList.remove("stale");
+    txt.innerHTML = state.lastUpdate ? `<span class="dot"></span>Updated ${ago(state.lastUpdate)}` : `<span class="dot"></span>Loading games…`;
+  }
+
+  function renderNotice() {
+    const el = document.getElementById("notice");
+    const msg = [notices.config, notices.ids, notices.schedule, notices.fetch].filter(Boolean).join(" ");
+    el.hidden = !msg;
+    el.textContent = msg;
+  }
+
+  function renderAll() {
+    notices.schedule = scheduleNotice();
+    renderNotice();
+    renderStandings();
+    renderTabs();
+    renderGames();
+    if (state.open) renderDialog();
+    else if (state.player) renderPlayer();
+  }
+
+  // ---------- game dialog ----------
+  function buildPositions(g) {
+    if (g.positions) return g.positions;
+    const c = new Chess();
+    const list = [{ fen: c.fen(), last: null }];
+    for (const san of g.moves) {
+      const m = c.move(san, { sloppy: true });
+      if (!m) break;
+      list.push({ fen: c.fen(), last: [m.from, m.to] });
+    }
+    return list;
+  }
+
+  function openGame(id, back) {
+    const g = state.games.get(id);
+    if (!g) return;
+    const positions = buildPositions(g);
+    state.player = null;
+    state.open = { id, positions, ply: positions.length - 1, back: back || null };
+    renderDialog();
+    const d = document.getElementById("dlg");
+    if (!d.open) d.showModal();
+  }
+
+  function renderDialog() {
+    const { id } = state.open;
+    const g = state.games.get(id);
+    if (!g) return;
+    // Keep up with new moves if the viewer was on the latest one.
+    const fresh = buildPositions(g);
+    if (fresh.length !== state.open.positions.length) {
+      const atEnd = state.open.ply === state.open.positions.length - 1;
+      state.open.positions = fresh;
+      state.open.ply = atEnd ? fresh.length - 1 : Math.min(state.open.ply, fresh.length - 1);
+    }
+    const ply = state.open.ply;
+    const cur = state.open.positions[ply];
+    const rName = (rounds.find((r) => r.ids.includes(id)) || {}).name || "";
+
+    let movesHTML = '<div class="moves" id="moves">';
+    for (let i = 0; i < g.moves.length; i += 2) {
+      movesHTML += `<div class="no">${i / 2 + 1}.</div>`;
+      for (const j of [i, i + 1]) {
+        if (j < g.moves.length) movesHTML += `<button type="button" class="move${ply === j + 1 ? " cur" : ""}" data-ply="${j + 1}">${esc(g.moves[j])}</button>`;
+        else movesHTML += "<span></span>";
+      }
+    }
+    if (!g.moves.length) movesHTML += '<div class="no"></div><span class="move" style="cursor:default;color:var(--muted)">No moves yet</span><span></span>';
+    movesHTML += "</div>";
+
+    const d = document.getElementById("dlg");
+    d.innerHTML = `<div class="dlg">
+      <div class="head">
+        <div>
+          <h3 id="dlg-title">${esc(displayName(g.white))} against ${esc(displayName(g.black))}</h3>
+          <p>${esc(rName)}${g.daysPerTurn ? `, ${g.daysPerTurn} day${g.daysPerTurn > 1 ? "s" : ""} per move` : ""}</p>
+        </div>
+        <div class="actions">
+          ${state.open.back ? `<button type="button" data-act="back">← ${esc(displayName(plainPlayer(state.open.back)))}</button>` : ""}
+          <button type="button" data-act="close">Close</button>
+        </div>
+      </div>
+      <div>
+        ${sideHTML(g.black, "black", g)}
+        <div style="margin:8px 0" id="dlg-board">${boardHTML(cur.fen, cur.last)}</div>
+        ${sideHTML(g.white, "white", g)}
+        <div class="controls">
+          <button type="button" data-act="first" aria-label="First position">⏮</button>
+          <button type="button" data-act="prev" aria-label="Previous move">◀</button>
+          <button type="button" data-act="next" aria-label="Next move">▶</button>
+          <button type="button" data-act="last" aria-label="Latest position">⏭</button>
+        </div>
+        <p class="keys">← → or mouse wheel to step through moves, Home and End for the start and latest position.</p>
+      </div>
+      <div class="side-panel">
+        <div class="status">${statusText(g)}</div>
+        ${g.opening ? `<div class="opening">${esc(g.opening)}</div>` : ""}
+        ${movesHTML}
+        <a href="https://lichess.org/${esc(g.id)}" target="_blank" rel="noopener">Open on Lichess</a>
+      </div>
+    </div>`;
+    const curBtn = d.querySelector(".move.cur");
+    if (curBtn) curBtn.scrollIntoView({ block: "nearest" });
+  }
+
+  function step(to) {
+    const o = state.open;
+    if (!o) return;
+    const ply = Math.max(0, Math.min(o.positions.length - 1, to));
+    if (ply === o.ply) return;
+    o.ply = ply;
+    const d = document.getElementById("dlg");
+    const cur = o.positions[ply];
+    d.querySelector("#dlg-board").innerHTML = boardHTML(cur.fen, cur.last);
+    d.querySelectorAll(".move.cur").forEach((b) => b.classList.remove("cur"));
+    const btn = d.querySelector(`.move[data-ply="${ply}"]`);
+    if (btn) { btn.classList.add("cur"); btn.scrollIntoView({ block: "nearest" }); }
+    else { const list = d.querySelector("#moves"); if (list && ply === 0) list.scrollTop = 0; }
+  }
+
+  // ---------- player view ----------
+  const expected = (me, opp) => 1 / (1 + Math.pow(10, (opp - me) / 400));
+  const signed = (n, digits = 0) => (n > 0 ? "+" : n < 0 ? "−" : "±") + Math.abs(n).toFixed(digits);
+
+  function playerGames(pid) {
+    const list = [];
+    rounds.forEach((r) => r.ids.forEach((id) => {
+      const g = state.games.get(id);
+      if (!g) return;
+      const color = g.white.id === pid ? "white" : g.black.id === pid ? "black" : null;
+      if (!color) return;
+      let score = null;
+      if (g.result && g.result !== "void") score = g.result === "½-½" ? 0.5 : (g.result === "1-0") === (color === "white") ? 1 : 0;
+      list.push({ g, round: r.name, color, me: g[color], opp: g[color === "white" ? "black" : "white"], score });
+    }));
+    return list;
+  }
+
+  function playerStats(list) {
+    const st = { n: 0, w: 0, d: 0, l: 0, frac: 0, pts: 0, exp: 0, expN: 0, oppSum: 0, oppN: 0, perfSum: 0, diff: 0, diffN: 0, live: 0,
+      white: { n: 0, pts: 0 }, black: { n: 0, pts: 0 } };
+    list.forEach(({ g, color, me, opp, score }) => {
+      if (g.result === "void") return;
+      if (score === null) { st.live++; return; }
+      st.n++;
+      st.frac += score;
+      const pts = score === 1 ? sc.win : score === 0 ? sc.loss : sc.draw;
+      st.pts += pts;
+      st[color].n++; st[color].pts += pts;
+      if (score === 1) st.w++; else if (score === 0) st.l++; else st.d++;
+      // Seed ratings are each player's fixed tournament rating; many Lichess
+      // correspondence ratings here are provisional. Fall back to the Lichess
+      // rating at the start of the game for a player without one.
+      const oppR = seedRatingOf(opp.id) ?? opp.rating;
+      const meR = seedRatingOf(me.id) ?? me.rating;
+      if (oppR != null) {
+        st.oppSum += oppR; st.oppN++;
+        // Lichess (as in its Swiss tournaments): opponent's rating, +500 for a win, −500 for a loss.
+        st.perfSum += oppR + (score === 1 ? 500 : score === 0 ? -500 : 0);
+        if (meR != null) { st.exp += expected(meR, oppR); st.expN++; }
+      }
+      if (me.ratingDiff != null) { st.diff += me.ratingDiff; st.diffN++; }
+    });
+    // Performance only makes sense when every finished game has a rated opponent.
+    st.perf = st.n && st.oppN === st.n ? Math.round(st.perfSum / st.n) : null;
+    st.avgOpp = st.oppN ? Math.round(st.oppSum / st.oppN) : null;
+    return st;
+  }
+
+  function openPlayer(pid) {
+    state.open = null;
+    state.player = pid;
+    renderPlayer();
+    const d = document.getElementById("dlg");
+    if (!d.open) d.showModal();
+    d.scrollTop = 0;
+  }
+
+  function tile(k, v, s, cls) {
+    return `<div class="tile"><div class="k">${k}</div><div class="v${cls ? " " + cls : ""}">${v}</div><div class="s">${s}</div></div>`;
+  }
+
+  function renderPlayer() {
+    const pid = state.player;
+    const table = computeStandings();
+    const rank = table.findIndex((p) => p.id === pid);
+    const row = table[rank];
+    if (!row) return;
+    const list = playerGames(pid);
+    const st = playerStats(list);
+    const nm = displayName(row);
+    const firstGame = [...list].sort((a, b) => (a.g.createdAt || 0) - (b.g.createdAt || 0))[0];
+    const startRating = firstGame && firstGame.me.rating != null ? firstGame.me.rating : null;
+    const toPlay = rounds.flatMap((r) => r.slots
+      .filter((x) => !x.id && (x.white === pid || x.black === pid))
+      .map((x) => {
+        const color = x.white === pid ? "white" : "black";
+        const opp = x.white === pid ? x.black : x.white;
+        return `<li><span class="chip ${color[0]}" title="With ${color}"></span>${esc(r.name)} · <b>${esc(displayName(plainPlayer(opp)))}</b></li>`;
+      }));
+    const cfgP = configNames.get(pid) || {};
+    const seed = cfgP.seed ?? null;
+    const moved = seed != null ? seed - (rank + 1) : 0;
+    const pct = st.n ? Math.round((st.frac / st.n) * 100) : null;
+    const colorLine = (c) => `With ${c}: ` + (st[c].n ? `<b>${fmtPts(st[c].pts) || "0"} of ${st[c].n}</b>` : "no finished games");
+
+    const tiles = [
+      tile("Rank", `${rank + 1}<span style="font-size:16px;color:var(--muted)">/${table.length}</span>`, `${row.tied ? `TW ${row.tiedWins} · ` : ""}SB ${fmtPts(Math.round(row.sb * 100) / 100) || "0"} · ${row.wins} win${row.wins === 1 ? "" : "s"}`),
+      seed != null ? tile("Seed", seed, moved > 0 ? `now ${ordinal(rank + 1)}, up ${moved} place${moved === 1 ? "" : "s"}` : moved < 0 ? `now ${ordinal(rank + 1)}, down ${-moved} place${moved === -1 ? "" : "s"}` : `now ${ordinal(rank + 1)}, as seeded`, moved > 0 ? "up" : "") : "",
+      tile("Points", fmtPts(st.pts) || "0", st.n ? `from ${st.n} finished game${st.n === 1 ? "" : "s"}, ${pct}%` : "no finished games yet"),
+      tile("Won · drawn · lost", `${st.w} · ${st.d} · ${st.l}`, st.live ? `${st.live} in progress` : "none in progress"),
+      tile("Performance", st.perf != null ? st.perf : "—", st.avgOpp != null ? `average opponent ${st.avgOpp} (seed ratings)` : "needs a finished game"),
+      tile("Rating change", st.diffN ? signed(st.diff) : "—", startRating != null ? `${startRating} at the first game` : "no rated games yet", st.diff > 0 ? "up" : ""),
+      tile("Against expectation", st.expN ? signed(st.frac - st.exp, 1) : "—", st.expN ? `expected ${(st.exp).toFixed(1)} from seed ratings` : "needs a finished game", st.frac - st.exp > 0.05 && st.expN ? "up" : ""),
+    ].join("");
+
+    const rowsHTML = list.map(({ g, round, color, me, opp, score }) => {
+      let res, note;
+      if (g.result === "void") { res = "—"; note = "Aborted, does not count"; }
+      else if (score === null) {
+        res = '<span class="live">● live</span>';
+        note = !g.moves.length ? "Not started" : `${esc(displayName(g.turn === color ? me : opp))} to move, last move ${ago(g.lastMoveAt)}`;
+      } else {
+        res = score === 1 ? "1" : score === 0 ? "0" : "½";
+        note = `${REASONS[g.status] || "finished"}${g.opening ? ", " + esc(g.opening) : ""}`;
+        note = note[0].toUpperCase() + note.slice(1);
+      }
+      const diff = me.ratingDiff != null ? signed(me.ratingDiff) : "";
+      return `<tr tabindex="0" data-game="${esc(g.id)}">
+        <td>${esc(round)}</td>
+        <td class="opp"><span class="chip ${color[0]}" title="Played with ${color}"></span>${esc(displayName(opp))}${ratingHTML(opp)}</td>
+        <td class="r">${res}</td>
+        <td class="num">${diff}</td>
+        <td class="num">${Math.ceil(g.moves.length / 2)}</td>
+        <td class="note">${note}</td>
+      </tr>`;
+    }).join("");
+
+    const d = document.getElementById("dlg");
+    d.innerHTML = `<div class="dlg pdlg">
+      <div class="head">
+        <div>
+          <h3 id="dlg-title">${esc(nm)}</h3>
+          <p>${cfgP.seedRating != null ? `Seed rating ${cfgP.seedRating}${cfgP.seedBasis ? ` (${esc(cfgP.seedBasis)})` : ""} · ` : ""}<a href="https://lichess.org/@/${esc(row.username)}" target="_blank" rel="noopener">${esc(row.username)} on Lichess</a></p>
+        </div>
+        <div class="actions"><button type="button" data-act="close" autofocus>Close</button></div>
+      </div>
+      <div class="tiles">${tiles}</div>
+      <p class="facts">${colorLine("white")} · ${colorLine("black")}</p>
+      ${toPlay.length ? `<div><h4>Still to play</h4><ul class="upcoming">${toPlay.join("")}</ul></div>` : list.length ? '<p class="facts">Has played every opponent.</p>' : ""}
+      <div>
+        <h4>Games</h4>
+        ${list.length ? `<div class="table-scroll"><table class="pgames">
+          <thead><tr><th>Round</th><th>Opponent</th><th style="text-align:center">Result</th><th class="num">Rating</th><th class="num">Moves</th><th>Notes</th></tr></thead>
+          <tbody>${rowsHTML}</tbody></table></div>` : '<p class="facts">No games yet.</p>'}
+      </div>
+      <p class="facts" style="font-size:12.5px">Ratings next to names are Lichess correspondence ratings at the start of each game. Performance and expected score use the seed ratings, each player's fixed rating for the tournament, because many Lichess correspondence ratings here are still provisional. Performance is Lichess's tournament performance over finished games: the average of each opponent's rating, plus 500 for a win and minus 500 for a loss. Rating change adds up what Lichess awarded for the finished games in this tournament.</p>
+    </div>`;
+  }
+
+  // ---------- events ----------
+  document.getElementById("tabs").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-r]");
+    if (!b) return;
+    state.round = +b.dataset.r;
+    renderTabs(); renderGames();
+  });
+  document.getElementById("cross").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-player]");
+    if (b) openPlayer(b.dataset.player);
+  });
+  document.getElementById("games").addEventListener("click", (e) => {
+    const c = e.target.closest(".game[data-id]");
+    if (c) openGame(c.dataset.id);
+  });
+  document.getElementById("games").addEventListener("keydown", (e) => {
+    const c = e.target.closest(".game[data-id]");
+    if (c && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openGame(c.dataset.id); }
+  });
+  const dlg = document.getElementById("dlg");
+  dlg.addEventListener("click", (e) => {
+    if (e.target === dlg) { dlg.close(); return; }
+    const tr = e.target.closest("tr[data-game]");
+    if (tr) return openGame(tr.dataset.game, state.player);
+    const b = e.target.closest("button");
+    if (!b) return;
+    if (b.dataset.ply) return step(+b.dataset.ply);
+    const o = state.open;
+    switch (b.dataset.act) {
+      case "close": dlg.close(); break;
+      case "back": openPlayer(o.back); break;
+      case "first": step(0); break;
+      case "prev": step(o.ply - 1); break;
+      case "next": step(o.ply + 1); break;
+      case "last": step(Infinity); break;
+    }
+  });
+  dlg.addEventListener("keydown", (e) => {
+    const tr = e.target.closest("tr[data-game]");
+    if (tr && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openGame(tr.dataset.game, state.player); }
+  });
+  // Listen on the document: the dialog is re-rendered on refresh, which can drop focus out of it.
+  document.addEventListener("keydown", (e) => {
+    const o = state.open;
+    if (!o || !dlg.open || e.altKey || e.ctrlKey || e.metaKey) return;
+    const to = { ArrowLeft: o.ply - 1, ArrowRight: o.ply + 1, Home: 0, End: Infinity }[e.key];
+    if (to === undefined) return;
+    e.preventDefault();
+    step(to);
+  });
+  // Wheel anywhere in the dialog except the move list, which scrolls normally.
+  // Deltas are accumulated so a touchpad doesn't race through the game.
+  let wheelAcc = 0, wheelAt = 0;
+  dlg.addEventListener("wheel", (e) => {
+    const o = state.open;
+    if (!o || e.target.closest("#moves") || e.ctrlKey) return;
+    e.preventDefault();
+    const now = Date.now();
+    if (now - wheelAt > 300) wheelAcc = 0;
+    wheelAt = now;
+    wheelAcc += e.deltaMode === 1 ? e.deltaY * 40 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
+    while (Math.abs(wheelAcc) >= 50) {
+      const dir = Math.sign(wheelAcc);
+      wheelAcc -= dir * 50;
+      step(o.ply + dir);
+    }
+  }, { passive: false });
+  dlg.addEventListener("close", () => { state.open = null; state.player = null; });
+  document.getElementById("refresh").addEventListener("click", () => refresh(true));
+
+  // ---------- refresh loop ----------
+  const FILE_HINT = " Browsers don't let a page opened straight from disk read other files. Serve the folder instead, for example with python3 -m http.server, and open http://localhost:8000/tournament.html.";
+  let busy = false;
+  async function refresh(manual) {
+    if (busy) return;
+    busy = true;
+    try {
+      try {
+        if (await loadConfig()) renderAll();
+        notices.config = "";
+      } catch (err) {
+        notices.config = `Could not read tournament.json. ${err.message || ""}` +
+          (location.protocol === "file:" ? FILE_HINT : "") +
+          (CONFIG ? " Showing the last version that loaded." : "");
+      }
+      renderNotice();
+      if (!CONFIG) { renderSync("No tournament data"); return; }
+      if (!allIds.length) { renderSync("No games added yet"); return; }
+      // Show what we already have (cached finished games, earlier fetches) right away.
+      if (!state.lastUpdate) { showGames(); renderAll(); }
+      if (!manual && Date.now() < state.pausedUntil) return;
+      renderSync("Updating…");
+      for (const id of allIds.filter((id) => !finishedCache[id])) {
+        const raw = await fetchGame(id);
+        if (!raw) { notFound.add(id); continue; }
+        notFound.delete(id);
+        cacheFinished(raw);
+        if (finishedCache[id]) liveGames.delete(id); else liveGames.set(id, raw);
+      }
+      showGames();
+      state.lastUpdate = Date.now();
+      notices.fetch = "";
+      renderNotice();
+      renderSync();
+      renderAll();
+      await updateHistories();
+    } catch (err) {
+      showGames();
+      renderAll();
+      if (err.rate) {
+        state.pausedUntil = Date.now() + 120000;
+        renderSync("Lichess asked us to slow down. Retrying in 2 minutes.");
+      } else {
+        renderSync("Update failed");
+        notices.fetch = `Could not load games from Lichess. ${err.message || ""} The page will try again automatically. If this keeps happening, check your network connection and the game IDs.`;
+        renderNotice();
+      }
+    } finally {
+      busy = false;
+    }
+  }
+
+  function showGames() {
+    const games = allIds.map((id) => finishedCache[id] || liveGames.get(id)).filter(Boolean);
+    state.games = new Map(games.map((g) => [g.id, withHistory(summarize(g))]));
+  }
+
+  // ---------- start ----------
+  renderAll();
+  refresh();
+  (function loop() {
+    const secs = Math.max(20, (CONFIG && CONFIG.refreshSeconds) || 300);
+    setTimeout(() => { if (!document.hidden) refresh(); loop(); }, secs * 1000);
+  })();
+  setInterval(() => { if (state.lastUpdate && !busy && Date.now() >= state.pausedUntil) renderSync(); }, 15000);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && (!state.lastUpdate || Date.now() - state.lastUpdate > 30000)) refresh();
+  });
+})();
+</script>
+</body>
+</html>
