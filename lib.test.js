@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  DAY_MS, fmtPts, deadlineOf, fmtLeft, extractId, isPrivateId, summarize,
+  START_FEN, DAY_MS, fmtPts, plural, deadlineOf, fmtLeft, extractId, isPrivateId, summarize,
   computeStandings, scheduleMismatch, playerGames, playerStats,
 } from "./lib.js";
 
@@ -78,6 +78,21 @@ test("TW counts wins against the whole tied group", () => {
   const players = playersMap([["a", 1], ["b", 2], ["c", 3], ["d", 4]]);
   const p = byId(standings(players, [game("a", "b", "1-0"), game("b", "c", "1-0"), game("c", "d", "1-0")]));
   assert.deepEqual([p.a.tiedWins, p.b.tiedWins, p.c.tiedWins], [1, 1, 0]);
+});
+
+test("equal on points, TW and SB: wins decide, then seed", () => {
+  // a, d and b on 1 point with SB ½ and no games between them. a and d won
+  // a game, b drew two, so b drops to third although seeded first. Seed,
+  // against name order, puts d before a and e before c.
+  const players = playersMap([["b", 1], ["d", 2], ["e", 3], ["a", 4], ["c", 5]]);
+  const rows = standings(players, [
+    game("a", "c", "1-0"), game("b", "c", "½-½"), game("b", "e", "½-½"), game("d", "e", "1-0"),
+  ]);
+  const p = byId(rows);
+  assert.deepEqual([p.a.pts, p.d.pts, p.b.pts], [1, 1, 1]);
+  assert.deepEqual([p.a.sb, p.d.sb, p.b.sb], [0.5, 0.5, 0.5]);
+  assert.deepEqual([p.a.tiedWins, p.d.tiedWins, p.b.tiedWins], [0, 0, 0]);
+  assert.deepEqual(rows.map((r) => r.id), ["d", "a", "b", "e", "c"]);
 });
 
 test("SB leaves out games in progress", () => {
@@ -168,6 +183,44 @@ test("performance falls back to Lichess ratings and counts live games apart", ()
   assert.ok(Math.abs(st.exp - 1 / (1 + 10 ** (-400 / 400))) < 1e-9);
 });
 
+test("no performance when an opponent has no rating at all", () => {
+  // o2 has no seed rating and no Lichess rating; o1 still counts for the average.
+  const players = playersMap([["me", 1, 1600], ["o1", 2, 1500], ["o2", 3]]);
+  const unrated = summarize({ id: "unrated1", status: "mate", winner: "white",
+    players: { white: { user: { id: "me", name: "me" } }, black: { user: { id: "o2", name: "o2" } } } });
+  const { rounds, games } = setup([game("o1", "me", "0-1"), unrated]);
+  const st = playerStats(playerGames("me", rounds, games), players);
+  assert.equal(st.n, 2);
+  assert.equal(st.perf, null);
+  assert.equal(st.avgOpp, 1500);
+});
+
+test("summarize", () => {
+  const g = summarize({
+    id: "AbCd1234", status: "started", players: {},
+    moves: "e4 e5 Nf3", lastFen: "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2",
+    lastMove: "g1f3", lastMoveAt: 5000, createdAt: 1000, opening: { name: "King's Knight Opening" }, daysPerTurn: 2,
+  });
+  assert.equal(g.result, null);
+  assert.equal(g.turn, "black");
+  assert.deepEqual(g.last, ["g1", "f3"]);
+  assert.equal(g.lastUci, "g1f3");
+  assert.deepEqual(g.moves, ["e4", "e5", "Nf3"]);
+  assert.equal(g.lastMoveAt, 5000);
+  assert.equal(g.opening, "King's Knight Opening");
+  assert.equal(g.white.username, "Anonymous");
+
+  // A new game: no moves, no lastFen and no lastMoveAt yet.
+  const fresh = summarize({ id: "Fresh123", status: "created", players: {}, createdAt: 1000 });
+  assert.equal(fresh.fen, START_FEN);
+  assert.equal(fresh.turn, "white");
+  assert.equal(fresh.last, null);
+  assert.deepEqual(fresh.moves, []);
+  assert.equal(fresh.lastMoveAt, 1000);
+  assert.equal(fresh.opening, "");
+  assert.equal(fresh.daysPerTurn, null);
+});
+
 test("schedule checks: reversed colours and wrong players", () => {
   const slot = { white: "a", black: "b" };
   assert.equal(scheduleMismatch(slot, game("a", "b", "live")), "");
@@ -198,6 +251,12 @@ test("fmtPts", () => {
   assert.equal(fmtPts(2.1), "2.1");
   assert.equal(fmtPts(1.999999), "2");
   assert.equal(fmtPts(1.005), "1");
+});
+
+test("plural", () => {
+  assert.equal(plural(1, "move"), "1 move");
+  assert.equal(plural(0, "move"), "0 moves");
+  assert.equal(plural(2, "finished game"), "2 finished games");
 });
 
 test("time left to move", () => {
