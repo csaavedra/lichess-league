@@ -1,10 +1,15 @@
-# Correspondence tournament viewer
+# lichess-league
 
-A single static page that follows a round-robin chess tournament played on
-Lichess: a crosstable with tiebreaks, each round's games with live boards, a
-move-by-move game view, and each player's performance. Game data comes
-straight from the Lichess API, refreshed every few minutes. There is no
-server, no build step and no account.
+Lichess runs arenas and Swiss events, but not tournaments whose games the
+players set up themselves: correspondence games, or a slow league where
+opponents agree when to play each round. This page follows such a tournament
+from a list of Lichess game IDs.
+
+It's a single static page: a crosstable with tiebreaks, each round's games
+with live boards, a move-by-move game view, and each player's performance.
+Game data comes straight from the Lichess API, refreshed every few minutes.
+There is no server, no build step and no account. For now it handles
+round-robin tournaments.
 
 There is no engine or evaluation anywhere on the page, by design: it's meant
 for games still in progress.
