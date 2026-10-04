@@ -120,3 +120,13 @@ beyond Node 22.7 or later, which runs `lib.js` as an ES module without a
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+The page loads, without bundling them:
+
+- [chess.js](https://github.com/jhlywa/chess.js) by Jeff Hlywa, BSD-2-Clause,
+  from jsDelivr.
+- The cburnett pieces by Colin M.L. Burnett, GPLv2+, from Lichess.
+- The Figtree and Spectral fonts, SIL Open Font License, from Google Fonts.
+
+This project is not affiliated with Lichess. Game data comes from the
+[Lichess API](https://lichess.org/api).
