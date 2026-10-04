@@ -27,6 +27,30 @@ Then open http://localhost:8000/tournament.html.
 To publish it, copy `tournament.html` (or rename it `index.html`), `lib.js`
 and `tournament.json` to any static host.
 
+### Trying it without real games
+
+`demo/` has made-up tournaments, to see how the page looks in situations
+that are hard to set up on Lichess:
+
+    python3 demo/serve.py
+
+Then open http://localhost:8000/demo/ and pick one:
+
+- `halfway`: finished, live and upcoming rounds.
+- `finished`: every game played, with ties in the standings.
+- `problems`: one game for each warning the page shows (reversed colours,
+  wrong players, unrated game, unknown ID, private token, little time
+  left, and more).
+- `unrated`: an unrated tournament with two rated games.
+
+Each scenario is a tournament file, `demo/NAME.json`, whose games have an
+extra `demo` field describing the game to fake: its result, whether the
+colours are swapped, whether it's rated, when the last move was made. The
+fields are listed at the top of `demo/mock.js`. The server adds that
+script to the page, and it answers the page's Lichess requests from those
+fields, with random legal moves. Nothing is sent to Lichess. To try a new
+situation, copy a scenario and edit it.
+
 ## The tournament file
 
 `tournament.json` holds everything about the tournament. The page re-reads it

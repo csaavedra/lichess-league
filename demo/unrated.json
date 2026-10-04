@@ -1,0 +1,64 @@
+{
+  "title": "Demo: unrated",
+  "subtitle": "An unrated tournament with two rated games, which get flagged",
+
+  "players": [
+    { "username": "player1", "name": "Alice", "seed": 1, "seedRating": 2000, "seedBasis": "Correspondence" },
+    { "username": "player2", "name": "Bob", "seed": 2, "seedRating": 1900, "seedBasis": "Correspondence" },
+    { "username": "player3", "name": "Carol", "seed": 3, "seedRating": 1800, "seedBasis": "Correspondence" },
+    { "username": "player4", "name": "Dave", "seed": 4, "seedRating": 1700, "seedBasis": "Correspondence" },
+    { "username": "player5", "name": "Erin", "seed": 5, "seedRating": 1600, "seedBasis": "Correspondence" },
+    { "username": "player6", "name": "Frank", "seed": 6, "seedRating": 1500, "seedBasis": "Correspondence" },
+    { "username": "player7", "name": "Grace", "seed": 7, "seedRating": 1400, "seedBasis": "Correspondence" },
+    { "username": "player8", "name": "Heidi", "seed": 8, "seedRating": 1300, "seedBasis": "Correspondence" }
+  ],
+
+  "rounds": [
+    { "name": "Round 1", "games": [
+      { "white": "player8", "black": "player1", "id": "unrtR1G1", "demo": { "result": "½-½" } },
+      { "white": "player2", "black": "player7", "id": "unrtR1G2", "demo": { "result": "0-1", "rated": true } },
+      { "white": "player3", "black": "player6", "id": "unrtR1G3", "demo": { "result": "1-0" } },
+      { "white": "player4", "black": "player5", "id": "unrtR1G4", "demo": { "result": "½-½" } }
+    ] },
+    { "name": "Round 2", "games": [
+      { "white": "player6", "black": "player4", "id": "unrtR2G1", "demo": { "result": "live" } },
+      { "white": "player5", "black": "player8", "id": "unrtR2G2", "demo": { "result": "live" } },
+      { "white": "player7", "black": "player3", "id": "unrtR2G3", "demo": { "result": "live" } },
+      { "white": "player1", "black": "player2", "id": "unrtR2G4", "demo": { "rated": true } }
+    ] },
+    { "name": "Round 3", "games": [
+      { "white": "player4", "black": "player7", "id": "" },
+      { "white": "player3", "black": "player1", "id": "" },
+      { "white": "player8", "black": "player2", "id": "" },
+      { "white": "player5", "black": "player6", "id": "" }
+    ] },
+    { "name": "Round 4", "games": [
+      { "white": "player2", "black": "player3", "id": "" },
+      { "white": "player7", "black": "player5", "id": "" },
+      { "white": "player1", "black": "player4", "id": "" },
+      { "white": "player6", "black": "player8", "id": "" }
+    ] },
+    { "name": "Round 5", "games": [
+      { "white": "player6", "black": "player7", "id": "" },
+      { "white": "player4", "black": "player2", "id": "" },
+      { "white": "player5", "black": "player1", "id": "" },
+      { "white": "player8", "black": "player3", "id": "" }
+    ] },
+    { "name": "Round 6", "games": [
+      { "white": "player2", "black": "player5", "id": "" },
+      { "white": "player1", "black": "player6", "id": "" },
+      { "white": "player7", "black": "player8", "id": "" },
+      { "white": "player3", "black": "player4", "id": "" }
+    ] },
+    { "name": "Round 7", "games": [
+      { "white": "player5", "black": "player3", "id": "" },
+      { "white": "player8", "black": "player4", "id": "" },
+      { "white": "player6", "black": "player2", "id": "" },
+      { "white": "player7", "black": "player1", "id": "" }
+    ] }
+  ],
+
+  "rated": false,
+  "scoring": { "win": 1, "draw": 0.5, "loss": 0 },
+  "refreshSeconds": 300
+}

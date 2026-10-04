@@ -1,0 +1,64 @@
+{
+  "title": "Demo: finished",
+  "subtitle": "Every game played, with ties in the standings",
+
+  "players": [
+    { "username": "player1", "name": "Alice", "seed": 1, "seedRating": 2000, "seedBasis": "Correspondence" },
+    { "username": "player2", "name": "Bob", "seed": 2, "seedRating": 1900, "seedBasis": "Correspondence" },
+    { "username": "player3", "name": "Carol", "seed": 3, "seedRating": 1800, "seedBasis": "Correspondence" },
+    { "username": "player4", "name": "Dave", "seed": 4, "seedRating": 1700, "seedBasis": "Correspondence" },
+    { "username": "player5", "name": "Erin", "seed": 5, "seedRating": 1600, "seedBasis": "Correspondence" },
+    { "username": "player6", "name": "Frank", "seed": 6, "seedRating": 1500, "seedBasis": "Correspondence" },
+    { "username": "player7", "name": "Grace", "seed": 7, "seedRating": 1400, "seedBasis": "Correspondence" },
+    { "username": "player8", "name": "Heidi", "seed": 8, "seedRating": 1300, "seedBasis": "Correspondence" }
+  ],
+
+  "rounds": [
+    { "name": "Round 1", "games": [
+      { "white": "player8", "black": "player1", "id": "doneR1G1", "demo": { "result": "1-0" } },
+      { "white": "player2", "black": "player7", "id": "doneR1G2", "demo": { "result": "1-0" } },
+      { "white": "player3", "black": "player6", "id": "doneR1G3", "demo": { "result": "1-0" } },
+      { "white": "player4", "black": "player5", "id": "doneR1G4", "demo": { "result": "0-1" } }
+    ] },
+    { "name": "Round 2", "games": [
+      { "white": "player6", "black": "player4", "id": "doneR2G1", "demo": { "result": "0-1" } },
+      { "white": "player5", "black": "player8", "id": "doneR2G2", "demo": { "result": "½-½" } },
+      { "white": "player7", "black": "player3", "id": "doneR2G3", "demo": { "result": "0-1" } },
+      { "white": "player1", "black": "player2", "id": "doneR2G4", "demo": { "result": "1-0" } }
+    ] },
+    { "name": "Round 3", "games": [
+      { "white": "player4", "black": "player7", "id": "doneR3G1", "demo": { "result": "½-½" } },
+      { "white": "player3", "black": "player1", "id": "doneR3G2", "demo": { "result": "0-1" } },
+      { "white": "player8", "black": "player2", "id": "doneR3G3", "demo": { "result": "0-1" } },
+      { "white": "player5", "black": "player6", "id": "doneR3G4", "demo": { "result": "1-0" } }
+    ] },
+    { "name": "Round 4", "games": [
+      { "white": "player2", "black": "player3", "id": "doneR4G1", "demo": { "result": "½-½" } },
+      { "white": "player7", "black": "player5", "id": "doneR4G2", "demo": { "result": "0-1" } },
+      { "white": "player1", "black": "player4", "id": "doneR4G3", "demo": { "result": "½-½" } },
+      { "white": "player6", "black": "player8", "id": "doneR4G4", "demo": { "result": "1-0" } }
+    ] },
+    { "name": "Round 5", "games": [
+      { "white": "player6", "black": "player7", "id": "doneR5G1", "demo": { "result": "0-1" } },
+      { "white": "player4", "black": "player2", "id": "doneR5G2", "demo": { "result": "0-1" } },
+      { "white": "player5", "black": "player1", "id": "doneR5G3", "demo": { "result": "0-1" } },
+      { "white": "player8", "black": "player3", "id": "doneR5G4", "demo": { "result": "0-1" } }
+    ] },
+    { "name": "Round 6", "games": [
+      { "white": "player2", "black": "player5", "id": "doneR6G1", "demo": { "result": "½-½" } },
+      { "white": "player1", "black": "player6", "id": "doneR6G2", "demo": { "result": "½-½" } },
+      { "white": "player7", "black": "player8", "id": "doneR6G3", "demo": { "result": "½-½" } },
+      { "white": "player3", "black": "player4", "id": "doneR6G4", "demo": { "result": "0-1" } }
+    ] },
+    { "name": "Round 7", "games": [
+      { "white": "player5", "black": "player3", "id": "doneR7G1", "demo": { "result": "0-1" } },
+      { "white": "player8", "black": "player4", "id": "doneR7G2", "demo": { "result": "0-1" } },
+      { "white": "player6", "black": "player2", "id": "doneR7G3", "demo": { "result": "½-½" } },
+      { "white": "player7", "black": "player1", "id": "doneR7G4", "demo": { "result": "½-½" } }
+    ] }
+  ],
+
+  "rated": true,
+  "scoring": { "win": 1, "draw": 0.5, "loss": 0 },
+  "refreshSeconds": 300
+}
