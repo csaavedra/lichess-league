@@ -128,8 +128,25 @@ table.cross { border-collapse: collapse; width: 100%; font-variant-numeric: tabu
 /* Round tabs */
 .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; }
 .tabs button { border-radius: 999px; padding: 8px 14px; font-weight: 500; }
+/* Upcoming rounds recede, finished ones settle, live ones stand out. */
+.tabs button[data-state="upcoming"] { background: transparent; border-style: dashed; color: var(--muted); }
+.tabs button[data-state="done"] {
+  --done: color-mix(in srgb, var(--ink) 8%, var(--bg));
+  background: var(--done); border-color: var(--done); color: var(--muted);
+}
+.tabs button[data-state="done"] .count { opacity: 1; color: var(--ink); }
+.tabs button[data-state="live"] {
+  background: color-mix(in srgb, var(--live) 10%, var(--surface)); border-color: var(--live); font-weight: 600;
+}
+.tabs button:hover { border-color: var(--muted); }
 .tabs button[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); font-weight: 600; }
 .tabs button .count { opacity: 0.65; font-weight: 500; margin-left: 4px; }
+.tabs .pulse {
+  position: relative; display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--live); margin-right: 7px; vertical-align: 1px;
+}
+.tabs [aria-selected="true"] .pulse { background: currentColor; }
+.vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .round-meta { color: var(--muted); font-size: 14px; margin: -6px 0 16px; }
 
 /* Game cards */
@@ -249,7 +266,12 @@ footer { color: var(--muted); font-size: 13.5px; border-top: 1px solid var(--lin
 }
 @media (prefers-reduced-motion: no-preference) {
   .game { transition: border-color 0.15s; }
+  .tabs .pulse::after {
+    content: ""; position: absolute; inset: 0; border-radius: 50%; background: inherit;
+    animation: pulse 2s ease-out infinite;
+  }
 }
+@keyframes pulse { from { transform: scale(1); opacity: 0.7; } to { transform: scale(2.8); opacity: 0; } }
 </style>
 <!-- Optional site theme: overrides the variables above. Not part of this repository. -->
 <link rel="stylesheet" href="theme/theme.css">
@@ -390,11 +412,7 @@ function applyConfig(cfg) {
   document.getElementById("subtitle").textContent = cfg.subtitle || "";
   document.title = title;
 
-  if (state.round === null || state.round >= rounds.length) {
-    let lastWithGames = -1;
-    rounds.forEach((r, i) => { if (r.ids.length) lastWithGames = i; });
-    state.round = Math.max(0, lastWithGames);
-  }
+  if (state.round === null || state.round >= rounds.length) state.round = currentRound();
 
   const allSlots = rounds.flatMap((r) => r.slots);
   const badIds = allSlots.filter((x) => x.raw && !x.id).map((x) => x.raw);
@@ -591,6 +609,19 @@ function roundStats(r) {
   return { done, live, total: r.slots.length, waiting: r.slots.filter((x) => !x.id).length };
 }
 
+// Finished once every game has a result, live once any game exists on Lichess, upcoming before that.
+function roundState(st) {
+  if (st.total && st.done === st.total) return "done";
+  return st.done || st.live ? "live" : "upcoming";
+}
+
+// The first round with a game in progress, else the last round with any games.
+function currentRound() {
+  const live = rounds.findIndex((r) => roundStats(r).live);
+  if (live >= 0) return live;
+  return Math.max(0, rounds.findLastIndex((r) => r.ids.length));
+}
+
 // A game whose players or colours differ from its slot in the schedule.
 function mismatchText(slot, g) {
   const kind = scheduleMismatch(slot, g);
@@ -609,12 +640,18 @@ function scheduleNotice() {
   return issues.join(" ");
 }
 
+const ROUND_LABELS = { upcoming: "not started", live: "in progress", done: "finished" };
+
 function renderTabs() {
   const el = document.getElementById("tabs");
   el.innerHTML = rounds.map((r, i) => {
     const st = roundStats(r);
-    const count = r.slots.length ? `<span class="count">${st.done}/${st.total}</span>` : "";
-    return `<button type="button" role="tab" aria-selected="${i === state.round}" data-r="${i}">${esc(r.name)}${count}</button>`;
+    const kind = roundState(st);
+    const label = ROUND_LABELS[kind];
+    const lead = kind === "live" ? '<span class="pulse" aria-hidden="true"></span>' : "";
+    const count = kind === "live" ? `<span class="count">${st.done}/${st.total}</span>`
+      : kind === "done" ? '<span class="count" aria-hidden="true">✓</span>' : "";
+    return `<button type="button" role="tab" aria-selected="${i === state.round}" data-r="${i}" data-state="${kind}" title="${label}">${lead}${esc(r.name)}${count}<span class="vh">, ${label}</span></button>`;
   }).join("");
 }
 
@@ -914,6 +951,7 @@ document.getElementById("tabs").addEventListener("click", (e) => {
   const b = e.target.closest("button[data-r]");
   if (!b) return;
   state.round = +b.dataset.r;
+  roundSettled = true;
   renderTabs(); renderGames();
 });
 document.getElementById("cross").addEventListener("click", (e) => {
@@ -983,6 +1021,7 @@ document.getElementById("refresh").addEventListener("click", () => refresh(true)
 const FILE_HINT = " Browsers don't let a page opened straight from disk read other files. Serve the folder instead, for example with python3 -m http.server, and open http://localhost:8000/tournament.html.";
 const RATE_PAUSE_MS = 120000, DEFAULT_REFRESH_S = 300, MIN_REFRESH_S = 20;
 let busy = false, retryTimer = null;
+let roundSettled = false; // until the first fetch or a click, the round shown can still move to currentRound()
 async function refresh(manual) {
   if (busy) return;
   busy = true;
@@ -1010,6 +1049,7 @@ async function refresh(manual) {
       if (finishedCache[id]) liveGames.delete(id); else liveGames.set(id, raw);
     }
     showGames();
+    if (!roundSettled) { state.round = currentRound(); roundSettled = true; }
     state.lastUpdate = Date.now();
     notices.fetch = "";
     renderNotice();
