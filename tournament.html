@@ -299,762 +299,760 @@ import {
 let Chess = null;
 try { ({ Chess } = await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dist/esm/chess.js")); } catch {}
 
-(() => {
-  const PIECE_URL = "https://lichess1.org/assets/piece/cburnett/";
-  const REASONS = {
-    mate: "checkmate", resign: "resignation", outoftime: "on time", timeout: "opponent left",
-    stalemate: "stalemate", draw: "draw", cheat: "fair-play forfeit", variantEnd: "game over",
-  };
+const PIECE_URL = "https://lichess1.org/assets/piece/cburnett/";
+const REASONS = {
+  mate: "checkmate", resign: "resignation", outoftime: "on time", timeout: "opponent left",
+  stalemate: "stalemate", draw: "draw", cheat: "fair-play forfeit", variantEnd: "game over",
+};
 
-  const state = {
-    games: new Map(),     // id -> summary
-    round: null,
-    lastUpdate: null,
-    pausedUntil: 0,
-    open: null,           // game view: { id, positions, ply, back }
-    player: null,         // player view: player id
-  };
+const state = {
+  games: new Map(),     // id -> summary
+  round: null,
+  lastUpdate: null,
+  pausedUntil: 0,
+  open: null,           // game view: { id, positions, ply, back }
+  player: null,         // player view: player id
+};
 
-  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
-  function ago(ts) {
-    if (!ts) return "";
-    const s = Math.round((ts - Date.now()) / 1000);
-    const abs = Math.abs(s);
-    if (abs < 60) return rtf.format(s, "second");
-    if (abs < 3600) return rtf.format(Math.round(s / 60), "minute");
-    if (abs < 86400) return rtf.format(Math.round(s / 3600), "hour");
-    return rtf.format(Math.round(s / 86400), "day");
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+function ago(ts) {
+  if (!ts) return "";
+  const s = Math.round((ts - Date.now()) / 1000);
+  const abs = Math.abs(s);
+  if (abs < 60) return rtf.format(s, "second");
+  if (abs < 3600) return rtf.format(Math.round(s / 60), "minute");
+  if (abs < 86400) return rtf.format(Math.round(s / 3600), "hour");
+  return rtf.format(Math.round(s / 86400), "day");
+}
+
+// Kept current by tickDeadlines() without re-rendering.
+function leftHTML(g) {
+  const dl = deadlineOf(g);
+  if (dl == null) return "";
+  const ms = dl - Date.now();
+  return `<span class="left${ms < DAY_MS ? " urgent" : ""}" data-deadline="${dl}">${fmtLeft(ms)}</span>`;
+}
+function tickDeadlines() {
+  for (const el of document.querySelectorAll(".left[data-deadline]")) {
+    const ms = +el.dataset.deadline - Date.now();
+    el.textContent = fmtLeft(ms);
+    el.classList.toggle("urgent", ms < DAY_MS);
   }
+}
 
-  // Kept current by tickDeadlines() without re-rendering.
-  function leftHTML(g) {
-    const dl = deadlineOf(g);
-    if (dl == null) return "";
-    const ms = dl - Date.now();
-    return `<span class="left${ms < DAY_MS ? " urgent" : ""}" data-deadline="${dl}">${fmtLeft(ms)}</span>`;
-  }
-  function tickDeadlines() {
-    for (const el of document.querySelectorAll(".left[data-deadline]")) {
-      const ms = +el.dataset.deadline - Date.now();
-      el.textContent = fmtLeft(ms);
-      el.classList.toggle("urgent", ms < DAY_MS);
-    }
-  }
+// ---------- config parsing ----------
+let config = null, configText = null;
+let rounds = [], allIds = [], roster = new Map(), scoring = DEFAULT_SCORING;
+const notices = { config: "", ids: "", schedule: "", fetch: "" };
+const liveGames = new Map(); // id -> latest export of a game not finished yet
+const notFound = new Set();
 
-  // ---------- config parsing ----------
-  let config = null, configText = null;
-  let rounds = [], allIds = [], roster = new Map(), scoring = DEFAULT_SCORING;
-  const notices = { config: "", ids: "", schedule: "", fetch: "" };
-  const liveGames = new Map(); // id -> latest export of a game not finished yet
-  const notFound = new Set();
+async function loadConfig() {
+  const res = await fetch("tournament.json", { cache: "no-cache" });
+  if (res.status === 404) throw new Error("The file is missing. Copy tournament.example.json to tournament.json next to this page and edit it.");
+  if (!res.ok) throw new Error(`The server answered with status ${res.status}.`);
+  const text = await res.text();
+  if (text === configText) return false;
+  let cfg;
+  try { cfg = JSON.parse(text); }
+  catch (err) { throw new Error(`It is not valid JSON: ${err.message}`); }
+  configText = text;
+  applyConfig(cfg);
+  return true;
+}
 
-  async function loadConfig() {
-    const res = await fetch("tournament.json", { cache: "no-cache" });
-    if (res.status === 404) throw new Error("The file is missing. Copy tournament.example.json to tournament.json next to this page and edit it.");
-    if (!res.ok) throw new Error(`The server answered with status ${res.status}.`);
-    const text = await res.text();
-    if (text === configText) return false;
-    let cfg;
-    try { cfg = JSON.parse(text); }
-    catch (err) { throw new Error(`It is not valid JSON: ${err.message}`); }
-    configText = text;
-    applyConfig(cfg);
-    return true;
-  }
-
-  function applyConfig(cfg) {
-    config = cfg;
-    const cfgRounds = Array.isArray(cfg.rounds) ? cfg.rounds : [];
-    // Each game is a scheduled pairing { white, black, id }; the id stays
-    // empty until the game is created on Lichess.
-    const user = (u) => String(u || "").trim().toLowerCase();
-    rounds = cfgRounds.map((r, i) => {
-      const slots = (r.games || []).map((x) => {
-        const raw = String(x.id || "").trim();
-        return { white: user(x.white), black: user(x.black), raw, id: raw ? extractId(raw) : null };
-      });
-      return { name: r.name || `Round ${i + 1}`, slots, ids: slots.map((x) => x.id).filter(Boolean) };
+function applyConfig(cfg) {
+  config = cfg;
+  const cfgRounds = Array.isArray(cfg.rounds) ? cfg.rounds : [];
+  // Each game is a scheduled pairing { white, black, id }; the id stays
+  // empty until the game is created on Lichess.
+  const user = (u) => String(u || "").trim().toLowerCase();
+  rounds = cfgRounds.map((r, i) => {
+    const slots = (r.games || []).map((x) => {
+      const raw = String(x.id || "").trim();
+      return { white: user(x.white), black: user(x.black), raw, id: raw ? extractId(raw) : null };
     });
-    allIds = [...new Set(rounds.flatMap((r) => r.ids))];
-    const num = (n) => (Number.isFinite(n) ? n : null);
-    roster = new Map(
-      (cfg.players || []).filter((p) => p.username).map((p) => [p.username.toLowerCase(), {
-        username: p.username, name: p.name || "",
-        seed: num(p.seed), seedRating: num(p.seedRating), seedBasis: p.seedBasis || "",
-      }])
-    );
-    scoring = { ...DEFAULT_SCORING, ...cfg.scoring };
+    return { name: r.name || `Round ${i + 1}`, slots, ids: slots.map((x) => x.id).filter(Boolean) };
+  });
+  allIds = [...new Set(rounds.flatMap((r) => r.ids))];
+  const num = (n) => (Number.isFinite(n) ? n : null);
+  roster = new Map(
+    (cfg.players || []).filter((p) => p.username).map((p) => [p.username.toLowerCase(), {
+      username: p.username, name: p.name || "",
+      seed: num(p.seed), seedRating: num(p.seedRating), seedBasis: p.seedBasis || "",
+    }])
+  );
+  scoring = { ...DEFAULT_SCORING, ...cfg.scoring };
 
-    const title = cfg.title || "Correspondence round-robin";
-    document.getElementById("title").textContent = title;
-    document.getElementById("subtitle").textContent = cfg.subtitle || "";
-    document.title = title;
+  const title = cfg.title || "Correspondence round-robin";
+  document.getElementById("title").textContent = title;
+  document.getElementById("subtitle").textContent = cfg.subtitle || "";
+  document.title = title;
 
-    if (state.round === null || state.round >= rounds.length) {
-      let lastWithGames = -1;
-      rounds.forEach((r, i) => { if (r.ids.length) lastWithGames = i; });
-      state.round = Math.max(0, lastWithGames);
-    }
-
-    const allSlots = rounds.flatMap((r) => r.slots);
-    const badIds = allSlots.filter((x) => x.raw && !x.id).map((x) => x.raw);
-    const privateIds = allSlots.map((x) => x.raw).filter(isPrivateId);
-    const unknown = [...new Set(allSlots.flatMap((x) => [x.white, x.black]).filter((u) => !roster.has(u)))];
-    const warnings = [];
-    if (unknown.length) warnings.push(`These usernames appear in the schedule in tournament.json but not in its players list: ${unknown.map((u) => u || "(empty)").join(", ")}.`);
-    if (privateIds.length) warnings.push(`Shorten these to their first 8 characters in tournament.json: ${privateIds.join(", ")}. The extra 4 characters are a player's private token that lets anyone move for them, and should never be shared.`);
-    if (badIds.length) warnings.push(`These entries in tournament.json are not valid Lichess game IDs and were skipped: ${badIds.join(", ")}.`);
-    notices.ids = warnings.join(" ");
+  if (state.round === null || state.round >= rounds.length) {
+    let lastWithGames = -1;
+    rounds.forEach((r, i) => { if (r.ids.length) lastWithGames = i; });
+    state.round = Math.max(0, lastWithGames);
   }
 
-  // ---------- data ----------
-  // One game at a time through the single-game export. The bulk endpoint
-  // (/api/games/export/_ids) allows only 2 concurrent requests per IP address,
-  // and Lichess can keep that slot taken long after a request ends, which
-  // blocks the page for everyone on the same network.
-  const rateError = () => Object.assign(new Error("rate"), { rate: true });
-  const EXPORT_PARAMS = "moves=true&lastFen=true&opening=true&evals=false&clocks=false&accuracy=false&literate=false";
-  async function fetchGame(id) {
-    const res = await fetch(`https://lichess.org/game/export/${id}?${EXPORT_PARAMS}`, { headers: { Accept: "application/json" } });
-    if (res.status === 404) return null;
+  const allSlots = rounds.flatMap((r) => r.slots);
+  const badIds = allSlots.filter((x) => x.raw && !x.id).map((x) => x.raw);
+  const privateIds = allSlots.map((x) => x.raw).filter(isPrivateId);
+  const unknown = [...new Set(allSlots.flatMap((x) => [x.white, x.black]).filter((u) => !roster.has(u)))];
+  const warnings = [];
+  if (unknown.length) warnings.push(`These usernames appear in the schedule in tournament.json but not in its players list: ${unknown.map((u) => u || "(empty)").join(", ")}.`);
+  if (privateIds.length) warnings.push(`Shorten these to their first 8 characters in tournament.json: ${privateIds.join(", ")}. The extra 4 characters are a player's private token that lets anyone move for them, and should never be shared.`);
+  if (badIds.length) warnings.push(`These entries in tournament.json are not valid Lichess game IDs and were skipped: ${badIds.join(", ")}.`);
+  notices.ids = warnings.join(" ");
+}
+
+// ---------- data ----------
+// One game at a time through the single-game export. The bulk endpoint
+// (/api/games/export/_ids) allows only 2 concurrent requests per IP address,
+// and Lichess can keep that slot taken long after a request ends, which
+// blocks the page for everyone on the same network.
+const rateError = () => Object.assign(new Error("rate"), { rate: true });
+const EXPORT_PARAMS = "moves=true&lastFen=true&opening=true&evals=false&clocks=false&accuracy=false&literate=false";
+async function fetchGame(id) {
+  const res = await fetch(`https://lichess.org/game/export/${id}?${EXPORT_PARAMS}`, { headers: { Accept: "application/json" } });
+  if (res.status === 404) return null;
+  if (res.status === 429) throw rateError();
+  if (!res.ok) throw new Error(`Lichess answered with status ${res.status}.`);
+  return res.json();
+}
+
+// The export API leaves out the last few moves of games in progress (an
+// anti-cheat delay), although lastFen is current. The game stream has the
+// full history, so read it until it reaches the exported position, then stop.
+const histories = new Map(); // id -> { key, moves, positions }
+const STREAM_TIMEOUT_MS = 15000;
+
+async function fetchHistory(g) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), STREAM_TIMEOUT_MS);
+  const target = fenKey(g.fen);
+  const list = [];
+  try {
+    const res = await fetch(`https://lichess.org/api/stream/game/${g.id}`, { signal: ctrl.signal, headers: { Accept: "application/x-ndjson" } });
     if (res.status === 429) throw rateError();
-    if (!res.ok) throw new Error(`Lichess answered with status ${res.status}.`);
-    return res.json();
-  }
-
-  // The export API leaves out the last few moves of games in progress (an
-  // anti-cheat delay), although lastFen is current. The game stream has the
-  // full history, so read it until it reaches the exported position, then stop.
-  const histories = new Map(); // id -> { key, moves, positions }
-  const STREAM_TIMEOUT_MS = 15000;
-
-  async function fetchHistory(g) {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), STREAM_TIMEOUT_MS);
-    const target = fenKey(g.fen);
-    const list = [];
-    try {
-      const res = await fetch(`https://lichess.org/api/stream/game/${g.id}`, { signal: ctrl.signal, headers: { Accept: "application/x-ndjson" } });
-      if (res.status === 429) throw rateError();
-      if (!res.ok || !res.body) return null;
-      const reader = res.body.getReader();
-      const dec = new TextDecoder();
-      let buf = "";
-      read: for (;;) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buf += dec.decode(value, { stream: true });
-        let nl;
-        while ((nl = buf.indexOf("\n")) >= 0) {
-          const line = buf.slice(0, nl).trim();
-          buf = buf.slice(nl + 1);
-          if (!line) continue;
-          const msg = JSON.parse(line);
-          if (!msg.fen || msg.id) continue; // the first line is the game itself
-          list.push(msg);
-          if (fenKey(msg.fen) === target && (msg.lm || null) === g.lastUci) break read;
-        }
+    if (!res.ok || !res.body) return null;
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    read: for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let nl;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, nl).trim();
+        buf = buf.slice(nl + 1);
+        if (!line) continue;
+        const msg = JSON.parse(line);
+        if (!msg.fen || msg.id) continue; // the first line is the game itself
+        list.push(msg);
+        if (fenKey(msg.fen) === target && (msg.lm || null) === g.lastUci) break read;
       }
-    } catch (err) {
-      if (err.rate) throw err;
-      return null;
-    } finally {
-      clearTimeout(timer);
-      ctrl.abort();
     }
-    if (!list.length || fenKey(list[list.length - 1].fen) !== target) return null;
-    return historyFromStream(list);
+  } catch (err) {
+    if (err.rate) throw err;
+    return null;
+  } finally {
+    clearTimeout(timer);
+    ctrl.abort();
   }
+  if (!list.length || fenKey(list[list.length - 1].fen) !== target) return null;
+  return historyFromStream(list);
+}
 
-  function fenKey(fen) { return String(fen || "").split(" ").slice(0, 2).join(" "); }
+function fenKey(fen) { return String(fen || "").split(" ").slice(0, 2).join(" "); }
 
-  // chess.js throws on an illegal move; return null instead.
-  function tryMove(c, move) {
-    try { return c.move(move); } catch { return null; }
-  }
+// chess.js throws on an illegal move; return null instead.
+function tryMove(c, move) {
+  try { return c.move(move); } catch { return null; }
+}
 
-  // The stream writes castling as the king's move (e1g1), which chess.js accepts.
-  function playUci(c, uci) {
-    return tryMove(c, { from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] });
-  }
+// The stream writes castling as the king's move (e1g1), which chess.js accepts.
+function playUci(c, uci) {
+  return tryMove(c, { from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] });
+}
 
-  function historyFromStream(list) {
-    const positions = list.map((m) => ({ fen: m.fen, last: m.lm ? [m.lm.slice(0, 2), m.lm.slice(2, 4)] : null }));
-    let c;
-    try { c = new Chess(list[0].fen); } catch { return null; }
-    const moves = list.slice(1).map((m) => (playUci(c, m.lm || "") || { san: m.lm }).san);
-    return { moves, positions };
-  }
+function historyFromStream(list) {
+  const positions = list.map((m) => ({ fen: m.fen, last: m.lm ? [m.lm.slice(0, 2), m.lm.slice(2, 4)] : null }));
+  let c;
+  try { c = new Chess(list[0].fen); } catch { return null; }
+  const moves = list.slice(1).map((m) => (playUci(c, m.lm || "") || { san: m.lm }).san);
+  return { moves, positions };
+}
 
-  // Use the streamed history when it is ahead of the exported move list.
-  function withHistory(g) {
+// Use the streamed history when it is ahead of the exported move list.
+function withHistory(g) {
+  const h = histories.get(g.id);
+  if (h && h.moves.length > g.moves.length) { g.moves = h.moves; g.positions = h.positions; }
+  return g;
+}
+
+async function updateHistories() {
+  if (!Chess) return; // the streamed moves can't be replayed without it
+  for (const g of state.games.values()) {
+    if (g.result || !g.lastUci) continue;
     const h = histories.get(g.id);
-    if (h && h.moves.length > g.moves.length) { g.moves = h.moves; g.positions = h.positions; }
-    return g;
+    if (h && h.key === g.fen) continue;
+    const fresh = await fetchHistory(g);
+    if (!fresh) continue;
+    histories.set(g.id, { key: g.fen, ...fresh });
+    withHistory(g);
+    renderAll();
   }
+}
 
-  async function updateHistories() {
-    if (!Chess) return; // the streamed moves can't be replayed without it
-    for (const g of state.games.values()) {
-      if (g.result || !g.lastUci) continue;
-      const h = histories.get(g.id);
-      if (h && h.key === g.fen) continue;
-      const fresh = await fetchHistory(g);
-      if (!fresh) continue;
-      histories.set(g.id, { key: g.fen, ...fresh });
-      withHistory(g);
-      renderAll();
-    }
-  }
-
-  // Finished games never change, so keep them in this browser and only ask
-  // Lichess for games still in progress (or not seen yet).
-  const CACHE_KEY = "tournament:finished-games:v1";
-  const finishedCache = (() => {
-    try { return JSON.parse(localStorage.getItem(CACHE_KEY)) || {}; } catch { return {}; }
-  })();
-  function cacheFinished(g) {
-    if (ONGOING.has(g.status)) return;
-    const { id, status, winner, players, moves, lastFen, lastMove, lastMoveAt, createdAt, opening, daysPerTurn } = g;
-    finishedCache[id] = { id, status, winner, players, moves, lastFen, lastMove, lastMoveAt, createdAt, opening, daysPerTurn };
-    try { localStorage.setItem(CACHE_KEY, JSON.stringify(finishedCache)); } catch { /* storage full or blocked */ }
-  }
-
-  const seedOf = (id) => roster.get(id)?.seed ?? null;
-  const ordinal = (n) => n + ((n % 100 >= 11 && n % 100 <= 13) ? "th" : ["th", "st", "nd", "rd"][n % 10] || "th");
-  // A player from a game (Lichess has the right capitalisation), or a username from the schedule.
-  const displayName = (p) => roster.get(p.id)?.name || p.username;
-  const nameOf = (id) => roster.get(id)?.name || roster.get(id)?.username || id;
-
-  const standings = () => computeStandings(rounds, state.games, roster, scoring);
-
-  // ---------- rendering ----------
-  function boardHTML(fen, last) {
-    const rows = (fen || START_FEN).split(" ")[0].split("/");
-    let html = '<div class="board" aria-hidden="true">';
-    rows.forEach((row, r) => {
-      let f = 0;
-      for (const ch of row) {
-        if (/\d/.test(ch)) {
-          for (let k = 0; k < +ch; k++, f++) html += sq(r, f, null, last);
-        } else { html += sq(r, f, ch, last); f++; }
-      }
-    });
-    return html + "</div>";
-  }
-  function sq(r, f, piece, last) {
-    const name = "abcdefgh"[f] + (8 - r);
-    const dark = (r + f) % 2 === 1;
-    const hl = last && (last[0] === name || last[1] === name);
-    let inner = "";
-    if (piece) {
-      const color = piece === piece.toUpperCase() ? "w" : "b";
-      inner = `<img src="${PIECE_URL}${color}${piece.toUpperCase()}.svg" alt="" draggable="false">`;
-    }
-    return `<div class="sq${dark ? " d" : ""}${hl ? " hl" : ""}">${inner}</div>`;
-  }
-
-  function renderStandings() {
-    const rows = standings();
-    const t = document.getElementById("cross");
-    if (!rows.length) {
-      t.innerHTML = '<tbody><tr><td class="name blank">Players appear here once you add usernames or game IDs to tournament.json.</td></tr></tbody>';
-      return;
-    }
-    let html = '<thead><tr><th>#</th><th class="name">Player</th><th title="Starting seed">Seed</th>';
-    rows.forEach((_, i) => { html += `<th>${i + 1}</th>`; });
-    html += '<th>Pts</th><th title="Wins against the players tied on points">TW</th><th title="Sonneborn–Berger">SB</th><th>Wins</th><th>Played</th></tr></thead><tbody>';
-    rows.forEach((p, i) => {
-      const nm = displayName(p);
-      const sub = nm !== p.username ? `<small>${esc(p.username)}</small>` : "";
-      html += `<tr><td class="rank">${i + 1}</td><td class="name"><button type="button" class="pname" data-player="${esc(p.id)}" aria-label="${esc(nm)}, show performance"><strong>${esc(nm)}</strong>${sub}</button></td><td class="minor">${seedOf(p.id) ?? ""}</td>`;
-      rows.forEach((o) => {
-        if (o.id === p.id) { html += '<td class="res self"></td>'; return; }
-        const list = p.cells.get(o.id) || [];
-        const parts = list.map((c) => c.live
-          ? '<span class="live" title="In progress">●</span>'
-          : `<span class="${c.kind}">${c.kind === "w" ? "1" : c.kind === "d" ? "½" : "0"}</span>`);
-        html += `<td class="res">${parts.join(" ")}</td>`;
-      });
-      html += `<td class="pts">${fmtPts(p.pts)}</td><td class="minor">${p.tied ? p.tiedWins : ""}</td><td class="minor">${fmtPts(p.sb)}</td><td class="minor">${p.wins}</td><td class="minor">${p.played}</td></tr>`;
-    });
-    t.innerHTML = html + "</tbody>";
-  }
-
-  function roundStats(r) {
-    let done = 0, live = 0;
-    r.ids.forEach((id) => {
-      const g = state.games.get(id);
-      if (!g) return;
-      if (g.result) done++; else live++;
-    });
-    return { done, live, total: r.slots.length, waiting: r.slots.filter((x) => !x.id).length };
-  }
-
-  // A game whose players or colours differ from its slot in the schedule.
-  function mismatchText(slot, g) {
-    const kind = scheduleMismatch(slot, g);
-    if (!kind) return "";
-    const want = `${nameOf(slot.white)} (white) against ${nameOf(slot.black)} (black)`;
-    if (kind === "reversed") return `Colours are reversed: the schedule has ${want}.`;
-    return `This is not the scheduled game: the schedule has ${want}.`;
-  }
-
-  function scheduleNotice() {
-    const issues = [];
-    rounds.forEach((r) => r.slots.forEach((slot) => {
-      const msg = mismatchText(slot, slot.id && state.games.get(slot.id));
-      if (msg) issues.push(`${r.name}, game ${slot.id}: ${msg}`);
-    }));
-    return issues.join(" ");
-  }
-
-  function renderTabs() {
-    const el = document.getElementById("tabs");
-    el.innerHTML = rounds.map((r, i) => {
-      const st = roundStats(r);
-      const count = r.slots.length ? `<span class="count">${st.done}/${st.total}</span>` : "";
-      return `<button type="button" role="tab" aria-selected="${i === state.round}" data-r="${i}">${esc(r.name)}${count}</button>`;
-    }).join("");
-  }
-
-  // The export gives each player's rating at the start of the game.
-  function ratingHTML(p) {
-    if (p.rating == null) return "";
-    return ` <span class="rt">(${p.rating}${p.provisional ? "?" : ""})</span>`;
-  }
-
-  function sideHTML(p, color, g) {
-    const toMove = !g.result && g.turn === color;
-    let score = "";
-    if (g.result && g.result !== "void") {
-      score = g.result === "½-½" ? "½" : (color === "white") === (g.result === "1-0") ? "1" : "0";
-    }
-    return `<div class="side${toMove ? " to-move" : ""}${score === "0" ? " lost" : ""}"><span class="chip ${color[0]}"></span><span class="nm">${esc(displayName(p))}${ratingHTML(p)}</span><span class="sc">${score}</span></div>`;
-  }
-
-  function plainSideHTML(id, color) {
-    return `<div class="side"><span class="chip ${color[0]}"></span><span class="nm">${esc(nameOf(id))}</span></div>`;
-  }
-
-  function statusText(g) {
-    if (g.result === "void") return "Aborted. This game does not count.";
-    const moveNo = Math.ceil(g.moves.length / 2);
-    if (g.result) {
-      const why = REASONS[g.status] || "finished";
-      return `<b>${g.result}</b> by ${why}, ${plural(moveNo, "move")}`;
-    }
-    if (!g.moves.length) return "<b>Not started.</b> White to make the first move.";
-    const who = displayName(g.turn === "white" ? g.white : g.black);
-    const left = leftHTML(g);
-    return `<b>${esc(who)} to move</b>${left ? `, ${left}` : ""}<br>Move ${g.turn === "white" ? moveNo + 1 : moveNo}, last move ${ago(g.lastMoveAt)}`;
-  }
-
-  function renderGames() {
-    const r = rounds[state.round];
-    const el = document.getElementById("games");
-    const meta = document.getElementById("round-meta");
-    if (!r) { el.innerHTML = ""; meta.textContent = ""; return; }
-    if (!r.slots.length) {
-      meta.textContent = "";
-      el.innerHTML = `<div class="empty">No games added for ${esc(r.name)} yet. Add them to this round in tournament.json, for example <code>{ "white": "user1", "black": "user2", "id": "AbCd1234" }</code>.</div>`;
-      return;
-    }
-    const st = roundStats(r);
-    meta.textContent = `${st.done} of ${st.total} games finished` + (st.live ? `, ${st.live} in progress` : "") +
-      (st.waiting ? `, ${st.waiting} not started yet` : "");
-    el.innerHTML = r.slots.map((slot) => {
-      const g = slot.id && state.games.get(slot.id);
-      if (!g) {
-        let status = "<b>Not started yet.</b>";
-        if (slot.id) status = `Game <b>${esc(slot.id)}</b> ${notFound.has(slot.id) ? "was not found on Lichess. Check the ID." : "is loading…"}`;
-        return `<div class="game pending" aria-disabled="true">
-          ${plainSideHTML(slot.black, "black")}
-          ${boardHTML(START_FEN, null)}
-          ${plainSideHTML(slot.white, "white")}
-          <div class="status">${status}</div>
-        </div>`;
-      }
-      const mismatch = mismatchText(slot, g);
-      return `<div class="game" role="button" tabindex="0" data-id="${esc(g.id)}" aria-label="${esc(displayName(g.white))} against ${esc(displayName(g.black))}, open game">
-        ${sideHTML(g.black, "black", g)}
-        ${boardHTML(g.fen, g.last)}
-        ${sideHTML(g.white, "white", g)}
-        <div class="status">${statusText(g)}</div>
-        ${mismatch ? `<div class="status warn">${esc(mismatch)}</div>` : ""}
-      </div>`;
-    }).join("");
-  }
-
-  // A message replaces "Updated …" and stays until the next renderSync().
-  let syncMsg = "";
-  function renderSync(msg = "") {
-    syncMsg = msg;
-    const text = msg || (state.lastUpdate ? `Updated ${ago(state.lastUpdate)}` : "Loading games…");
-    document.getElementById("sync").classList.toggle("stale", !!msg);
-    document.getElementById("sync-text").innerHTML = `<span class="dot"></span>${esc(text)}`;
-  }
-
-  function renderNotice() {
-    const el = document.getElementById("notice");
-    const msg = Object.values(notices).filter(Boolean).join(" ");
-    el.hidden = !msg;
-    el.textContent = msg;
-  }
-
-  function renderAll() {
-    notices.schedule = scheduleNotice();
-    renderNotice();
-    renderStandings();
-    renderTabs();
-    renderGames();
-    if (state.open) renderDialog();
-    else if (state.player) renderPlayer();
-  }
-
-  // ---------- game dialog ----------
-  function buildPositions(g) {
-    if (g.positions) return g.positions;
-    if (!Chess) return [{ fen: g.fen, last: g.last }];
-    const c = new Chess();
-    const list = [{ fen: c.fen(), last: null }];
-    for (const san of g.moves) {
-      const m = tryMove(c, san);
-      if (!m) break;
-      list.push({ fen: c.fen(), last: [m.from, m.to] });
-    }
-    return list;
-  }
-
-  function openGame(id, back) {
-    const g = state.games.get(id);
-    if (!g) return;
-    state.player = null;
-    // renderDialog() fills in the positions and moves to the latest one.
-    state.open = { id, positions: [], ply: -1, back: back || null };
-    renderDialog();
-    const d = document.getElementById("dlg");
-    if (!d.open) d.showModal();
-  }
-
-  function renderDialog() {
-    const { id } = state.open;
-    const g = state.games.get(id);
-    if (!g) return;
-    // Keep up with new moves if the viewer was on the latest one.
-    const fresh = buildPositions(g);
-    if (fresh.length !== state.open.positions.length) {
-      const atEnd = state.open.ply === state.open.positions.length - 1;
-      state.open.positions = fresh;
-      state.open.ply = atEnd ? fresh.length - 1 : Math.min(state.open.ply, fresh.length - 1);
-    }
-    const ply = state.open.ply;
-    const cur = state.open.positions[ply];
-    const rName = rounds.find((r) => r.ids.includes(id))?.name || "";
-
-    let movesHTML = '<div class="moves" id="moves">';
-    for (let i = 0; i < g.moves.length; i += 2) {
-      movesHTML += `<div class="no">${i / 2 + 1}.</div>`;
-      for (const j of [i, i + 1]) {
-        if (j < g.moves.length) movesHTML += `<button type="button" class="move${ply === j + 1 ? " cur" : ""}" data-ply="${j + 1}">${esc(g.moves[j])}</button>`;
-        else movesHTML += "<span></span>";
-      }
-    }
-    if (!g.moves.length) movesHTML += '<div class="no"></div><span class="none">No moves yet</span>';
-    movesHTML += "</div>";
-
-    const d = document.getElementById("dlg");
-    d.innerHTML = `<div class="dlg">
-      <div class="head">
-        <div>
-          <h3 id="dlg-title">${esc(displayName(g.white))} against ${esc(displayName(g.black))}</h3>
-          <p>${esc(rName)}${g.daysPerTurn ? `, ${plural(g.daysPerTurn, "day")} per move` : ""}</p>
-        </div>
-        <div class="actions">
-          ${state.open.back ? `<button type="button" data-act="back">← ${esc(nameOf(state.open.back))}</button>` : ""}
-          <button type="button" data-act="close">Close</button>
-        </div>
-      </div>
-      <div>
-        ${sideHTML(g.black, "black", g)}
-        <div class="dlg-board" id="dlg-board">${boardHTML(cur.fen, cur.last)}</div>
-        ${sideHTML(g.white, "white", g)}
-        <div class="controls">
-          <button type="button" data-act="first" aria-label="First position">⏮</button>
-          <button type="button" data-act="prev" aria-label="Previous move">◀</button>
-          <button type="button" data-act="next" aria-label="Next move">▶</button>
-          <button type="button" data-act="last" aria-label="Latest position">⏭</button>
-        </div>
-        <p class="keys">← → or mouse wheel to step through moves, Home and End for the start and latest position.</p>
-      </div>
-      <div class="side-panel">
-        <div class="status">${statusText(g)}</div>
-        ${g.opening ? `<div class="opening">${esc(g.opening)}</div>` : ""}
-        ${movesHTML}
-        <a href="https://lichess.org/${esc(g.id)}" target="_blank" rel="noopener">Open on Lichess</a>
-      </div>
-    </div>`;
-    const curBtn = d.querySelector(".move.cur");
-    if (curBtn) curBtn.scrollIntoView({ block: "nearest" });
-  }
-
-  function step(to) {
-    const o = state.open;
-    if (!o) return;
-    const ply = Math.max(0, Math.min(o.positions.length - 1, to));
-    if (ply === o.ply) return;
-    o.ply = ply;
-    const d = document.getElementById("dlg");
-    const cur = o.positions[ply];
-    d.querySelector("#dlg-board").innerHTML = boardHTML(cur.fen, cur.last);
-    d.querySelectorAll(".move.cur").forEach((b) => b.classList.remove("cur"));
-    const btn = d.querySelector(`.move[data-ply="${ply}"]`);
-    if (btn) { btn.classList.add("cur"); btn.scrollIntoView({ block: "nearest" }); }
-    else { const list = d.querySelector("#moves"); if (list && ply === 0) list.scrollTop = 0; }
-  }
-
-  // ---------- player view ----------
-  const signed = (n, digits = 0) => (n > 0 ? "+" : n < 0 ? "−" : "±") + Math.abs(n).toFixed(digits);
-
-  function openPlayer(pid) {
-    state.open = null;
-    state.player = pid;
-    renderPlayer();
-    const d = document.getElementById("dlg");
-    if (!d.open) d.showModal();
-    d.scrollTop = 0;
-  }
-
-  function tile(k, v, s, cls) {
-    return `<div class="tile"><div class="k">${k}</div><div class="v${cls ? " " + cls : ""}">${v}</div><div class="s">${s}</div></div>`;
-  }
-
-  function renderPlayer() {
-    const pid = state.player;
-    const table = standings();
-    const rank = table.findIndex((p) => p.id === pid);
-    const row = table[rank];
-    if (!row) return;
-    const list = playerGames(pid, rounds, state.games);
-    const st = playerStats(list, roster, scoring);
-    const nm = displayName(row);
-    const firstGame = [...list].sort((a, b) => (a.g.createdAt || 0) - (b.g.createdAt || 0))[0];
-    const startRating = firstGame?.me.rating ?? null;
-    const toPlay = rounds.flatMap((r) => r.slots
-      .filter((x) => !x.id && (x.white === pid || x.black === pid))
-      .map((x) => {
-        const color = x.white === pid ? "white" : "black";
-        const opp = x.white === pid ? x.black : x.white;
-        return `<li><span class="chip ${color[0]}" title="With ${color}"></span>${esc(r.name)} · <b>${esc(nameOf(opp))}</b></li>`;
-      }));
-    const cfgP = roster.get(pid) || {};
-    const seed = cfgP.seed ?? null;
-    const moved = seed != null ? seed - (rank + 1) : 0;
-    const pct = st.n ? Math.round((st.frac / st.n) * 100) : null;
-    const colorLine = (c) => `With ${c}: ` + (st[c].n ? `<b>${fmtPts(st[c].pts)} of ${st[c].n}</b>` : "no finished games");
-    const now = `now ${ordinal(rank + 1)}`;
-
-    const tiles = [
-      tile("Rank", `${rank + 1}<small>/${table.length}</small>`, `${row.tied ? `TW ${row.tiedWins} · ` : ""}SB ${fmtPts(row.sb)} · ${plural(row.wins, "win")}`),
-      seed != null ? tile("Seed", seed, moved ? `${now}, ${moved > 0 ? "up" : "down"} ${plural(Math.abs(moved), "place")}` : `${now}, as seeded`, moved > 0 ? "up" : "") : "",
-      tile("Points", fmtPts(st.pts), st.n ? `from ${plural(st.n, "finished game")}, ${pct}%` : "no finished games yet"),
-      tile("Won · drawn · lost", `${st.w} · ${st.d} · ${st.l}`, st.live ? `${st.live} in progress` : "none in progress"),
-      tile("Performance", st.perf != null ? st.perf : "—", st.avgOpp != null ? `average opponent ${st.avgOpp} (seed ratings)` : "needs a finished game"),
-      tile("Rating change", st.diffN ? signed(st.diff) : "—", startRating != null ? `${startRating} at the first game` : "no rated games yet", st.diff > 0 ? "up" : ""),
-      tile("Against expectation", st.expN ? signed(st.frac - st.exp, 1) : "—", st.expN ? `expected ${st.exp.toFixed(1)} from seed ratings` : "needs a finished game", st.frac - st.exp > 0.05 && st.expN ? "up" : ""),
-    ].join("");
-
-    const rowsHTML = list.map(({ g, round, color, me, opp, score }) => {
-      let res, note;
-      if (g.result === "void") { res = "—"; note = "Aborted, does not count"; }
-      else if (score === null) {
-        res = '<span class="live">● live</span>';
-        const left = leftHTML(g);
-        note = !g.moves.length ? "Not started" : `${esc(displayName(g.turn === color ? me : opp))} to move, ${left ? `${left}, ` : ""}last move ${ago(g.lastMoveAt)}`;
-      } else {
-        res = score === 1 ? "1" : score === 0 ? "0" : "½";
-        note = `${REASONS[g.status] || "finished"}${g.opening ? ", " + esc(g.opening) : ""}`;
-        note = note[0].toUpperCase() + note.slice(1);
-      }
-      const diff = me.ratingDiff != null ? signed(me.ratingDiff) : "";
-      return `<tr tabindex="0" data-game="${esc(g.id)}">
-        <td>${esc(round)}</td>
-        <td class="opp"><span class="chip ${color[0]}" title="Played with ${color}"></span>${esc(displayName(opp))}${ratingHTML(opp)}</td>
-        <td class="r">${res}</td>
-        <td class="num">${diff}</td>
-        <td class="num">${Math.ceil(g.moves.length / 2)}</td>
-        <td class="note">${note}</td>
-      </tr>`;
-    }).join("");
-
-    const d = document.getElementById("dlg");
-    d.innerHTML = `<div class="dlg pdlg">
-      <div class="head">
-        <div>
-          <h3 id="dlg-title">${esc(nm)}</h3>
-          <p>${cfgP.seedRating != null ? `Seed rating ${cfgP.seedRating}${cfgP.seedBasis ? ` (${esc(cfgP.seedBasis)})` : ""} · ` : ""}<a href="https://lichess.org/@/${esc(row.username)}" target="_blank" rel="noopener">${esc(row.username)} on Lichess</a></p>
-        </div>
-        <div class="actions"><button type="button" data-act="close" autofocus>Close</button></div>
-      </div>
-      <div class="tiles">${tiles}</div>
-      <p class="facts">${colorLine("white")} · ${colorLine("black")}</p>
-      ${toPlay.length ? `<div><h4>Still to play</h4><ul class="upcoming">${toPlay.join("")}</ul></div>` : list.length ? '<p class="facts">Has played every opponent.</p>' : ""}
-      <div>
-        <h4>Games</h4>
-        ${list.length ? `<div class="table-scroll"><table class="pgames">
-          <thead><tr><th>Round</th><th>Opponent</th><th class="r">Result</th><th class="num">Rating</th><th class="num">Moves</th><th>Notes</th></tr></thead>
-          <tbody>${rowsHTML}</tbody></table></div>` : '<p class="facts">No games yet.</p>'}
-      </div>
-      <p class="facts fine">Ratings next to names are Lichess correspondence ratings at the start of each game. Performance and expected score use the seed ratings, each player's fixed rating for the tournament, because many Lichess correspondence ratings here are still provisional. Performance is Lichess's tournament performance over finished games: the average of each opponent's rating, plus 500 for a win and minus 500 for a loss. Rating change adds up what Lichess awarded for the finished games in this tournament.</p>
-    </div>`;
-  }
-
-  // ---------- events ----------
-  document.getElementById("tabs").addEventListener("click", (e) => {
-    const b = e.target.closest("button[data-r]");
-    if (!b) return;
-    state.round = +b.dataset.r;
-    renderTabs(); renderGames();
-  });
-  document.getElementById("cross").addEventListener("click", (e) => {
-    const b = e.target.closest("button[data-player]");
-    if (b) openPlayer(b.dataset.player);
-  });
-  document.getElementById("games").addEventListener("click", (e) => {
-    const c = e.target.closest(".game[data-id]");
-    if (c) openGame(c.dataset.id);
-  });
-  document.getElementById("games").addEventListener("keydown", (e) => {
-    const c = e.target.closest(".game[data-id]");
-    if (c && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openGame(c.dataset.id); }
-  });
-  const dlg = document.getElementById("dlg");
-  dlg.addEventListener("click", (e) => {
-    if (e.target === dlg) { dlg.close(); return; }
-    const tr = e.target.closest("tr[data-game]");
-    if (tr) return openGame(tr.dataset.game, state.player);
-    const b = e.target.closest("button");
-    if (!b) return;
-    if (b.dataset.ply) return step(+b.dataset.ply);
-    const o = state.open;
-    switch (b.dataset.act) {
-      case "close": dlg.close(); break;
-      case "back": openPlayer(o.back); break;
-      case "first": step(0); break;
-      case "prev": step(o.ply - 1); break;
-      case "next": step(o.ply + 1); break;
-      case "last": step(Infinity); break;
-    }
-  });
-  dlg.addEventListener("keydown", (e) => {
-    const tr = e.target.closest("tr[data-game]");
-    if (tr && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openGame(tr.dataset.game, state.player); }
-  });
-  // Listen on the document: the dialog is re-rendered on refresh, which can drop focus out of it.
-  document.addEventListener("keydown", (e) => {
-    const o = state.open;
-    if (!o || !dlg.open || e.altKey || e.ctrlKey || e.metaKey) return;
-    const to = { ArrowLeft: o.ply - 1, ArrowRight: o.ply + 1, Home: 0, End: Infinity }[e.key];
-    if (to === undefined) return;
-    e.preventDefault();
-    step(to);
-  });
-  // Wheel anywhere in the dialog except the move list, which scrolls normally.
-  // Deltas are accumulated so a touchpad doesn't race through the game.
-  let wheelAcc = 0, wheelAt = 0;
-  dlg.addEventListener("wheel", (e) => {
-    const o = state.open;
-    if (!o || e.target.closest("#moves") || e.ctrlKey) return;
-    e.preventDefault();
-    const now = Date.now();
-    if (now - wheelAt > 300) wheelAcc = 0;
-    wheelAt = now;
-    wheelAcc += e.deltaMode === 1 ? e.deltaY * 40 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
-    while (Math.abs(wheelAcc) >= 50) {
-      const dir = Math.sign(wheelAcc);
-      wheelAcc -= dir * 50;
-      step(o.ply + dir);
-    }
-  }, { passive: false });
-  dlg.addEventListener("close", () => { state.open = null; state.player = null; });
-  document.getElementById("refresh").addEventListener("click", () => refresh(true));
-
-  // ---------- refresh loop ----------
-  const FILE_HINT = " Browsers don't let a page opened straight from disk read other files. Serve the folder instead, for example with python3 -m http.server, and open http://localhost:8000/tournament.html.";
-  const RATE_PAUSE_MS = 120000, DEFAULT_REFRESH_S = 300, MIN_REFRESH_S = 20;
-  let busy = false, retryTimer = null;
-  async function refresh(manual) {
-    if (busy) return;
-    busy = true;
-    try {
-      try {
-        if (await loadConfig()) renderAll();
-        notices.config = "";
-      } catch (err) {
-        notices.config = `Could not read tournament.json. ${err.message || ""}` +
-          (location.protocol === "file:" ? FILE_HINT : "") +
-          (config ? " Showing the last version that loaded." : "");
-      }
-      renderNotice();
-      if (!config) { renderSync("No tournament data"); return; }
-      if (!allIds.length) { renderSync("No games added yet"); return; }
-      // Show what we already have (cached finished games, earlier fetches) right away.
-      if (!state.lastUpdate) { showGames(); renderAll(); }
-      if (!manual && Date.now() < state.pausedUntil) return;
-      renderSync("Updating…");
-      for (const id of allIds.filter((id) => !finishedCache[id])) {
-        const raw = await fetchGame(id);
-        if (!raw) { notFound.add(id); continue; }
-        notFound.delete(id);
-        cacheFinished(raw);
-        if (finishedCache[id]) liveGames.delete(id); else liveGames.set(id, raw);
-      }
-      showGames();
-      state.lastUpdate = Date.now();
-      notices.fetch = "";
-      renderNotice();
-      renderSync();
-      renderAll();
-      await updateHistories();
-    } catch (err) {
-      showGames();
-      renderAll();
-      if (err.rate) {
-        state.pausedUntil = Date.now() + RATE_PAUSE_MS;
-        clearTimeout(retryTimer);
-        retryTimer = setTimeout(refresh, RATE_PAUSE_MS);
-        renderSync("Lichess asked us to slow down. Retrying in 2 minutes.");
-      } else {
-        renderSync("Update failed");
-        notices.fetch = `Could not load games from Lichess. ${err.message || ""} The page will try again automatically. If this keeps happening, check your network connection and the game IDs.`;
-        renderNotice();
-      }
-    } finally {
-      busy = false;
-    }
-  }
-
-  function showGames() {
-    const games = allIds.map((id) => finishedCache[id] || liveGames.get(id)).filter(Boolean);
-    state.games = new Map(games.map((g) => [g.id, withHistory(summarize(g))]));
-  }
-
-  // ---------- start ----------
-  renderAll();
-  refresh();
-  (function loop() {
-    const secs = Math.max(MIN_REFRESH_S, config?.refreshSeconds || DEFAULT_REFRESH_S);
-    setTimeout(() => { if (!document.hidden) refresh(); loop(); }, secs * 1000);
-  })();
-  setInterval(() => {
-    tickDeadlines();
-    if (state.lastUpdate && !busy && !syncMsg) renderSync();
-  }, 15000);
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden && (!state.lastUpdate || Date.now() - state.lastUpdate > 30000)) refresh();
-  });
+// Finished games never change, so keep them in this browser and only ask
+// Lichess for games still in progress (or not seen yet).
+const CACHE_KEY = "tournament:finished-games:v1";
+const finishedCache = (() => {
+  try { return JSON.parse(localStorage.getItem(CACHE_KEY)) || {}; } catch { return {}; }
 })();
+function cacheFinished(g) {
+  if (ONGOING.has(g.status)) return;
+  const { id, status, winner, players, moves, lastFen, lastMove, lastMoveAt, createdAt, opening, daysPerTurn } = g;
+  finishedCache[id] = { id, status, winner, players, moves, lastFen, lastMove, lastMoveAt, createdAt, opening, daysPerTurn };
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify(finishedCache)); } catch { /* storage full or blocked */ }
+}
+
+const seedOf = (id) => roster.get(id)?.seed ?? null;
+const ordinal = (n) => n + ((n % 100 >= 11 && n % 100 <= 13) ? "th" : ["th", "st", "nd", "rd"][n % 10] || "th");
+// A player from a game (Lichess has the right capitalisation), or a username from the schedule.
+const displayName = (p) => roster.get(p.id)?.name || p.username;
+const nameOf = (id) => roster.get(id)?.name || roster.get(id)?.username || id;
+
+const standings = () => computeStandings(rounds, state.games, roster, scoring);
+
+// ---------- rendering ----------
+function boardHTML(fen, last) {
+  const rows = (fen || START_FEN).split(" ")[0].split("/");
+  let html = '<div class="board" aria-hidden="true">';
+  rows.forEach((row, r) => {
+    let f = 0;
+    for (const ch of row) {
+      if (/\d/.test(ch)) {
+        for (let k = 0; k < +ch; k++, f++) html += sq(r, f, null, last);
+      } else { html += sq(r, f, ch, last); f++; }
+    }
+  });
+  return html + "</div>";
+}
+function sq(r, f, piece, last) {
+  const name = "abcdefgh"[f] + (8 - r);
+  const dark = (r + f) % 2 === 1;
+  const hl = last && (last[0] === name || last[1] === name);
+  let inner = "";
+  if (piece) {
+    const color = piece === piece.toUpperCase() ? "w" : "b";
+    inner = `<img src="${PIECE_URL}${color}${piece.toUpperCase()}.svg" alt="" draggable="false">`;
+  }
+  return `<div class="sq${dark ? " d" : ""}${hl ? " hl" : ""}">${inner}</div>`;
+}
+
+function renderStandings() {
+  const rows = standings();
+  const t = document.getElementById("cross");
+  if (!rows.length) {
+    t.innerHTML = '<tbody><tr><td class="name blank">Players appear here once you add usernames or game IDs to tournament.json.</td></tr></tbody>';
+    return;
+  }
+  let html = '<thead><tr><th>#</th><th class="name">Player</th><th title="Starting seed">Seed</th>';
+  rows.forEach((_, i) => { html += `<th>${i + 1}</th>`; });
+  html += '<th>Pts</th><th title="Wins against the players tied on points">TW</th><th title="Sonneborn–Berger">SB</th><th>Wins</th><th>Played</th></tr></thead><tbody>';
+  rows.forEach((p, i) => {
+    const nm = displayName(p);
+    const sub = nm !== p.username ? `<small>${esc(p.username)}</small>` : "";
+    html += `<tr><td class="rank">${i + 1}</td><td class="name"><button type="button" class="pname" data-player="${esc(p.id)}" aria-label="${esc(nm)}, show performance"><strong>${esc(nm)}</strong>${sub}</button></td><td class="minor">${seedOf(p.id) ?? ""}</td>`;
+    rows.forEach((o) => {
+      if (o.id === p.id) { html += '<td class="res self"></td>'; return; }
+      const list = p.cells.get(o.id) || [];
+      const parts = list.map((c) => c.live
+        ? '<span class="live" title="In progress">●</span>'
+        : `<span class="${c.kind}">${c.kind === "w" ? "1" : c.kind === "d" ? "½" : "0"}</span>`);
+      html += `<td class="res">${parts.join(" ")}</td>`;
+    });
+    html += `<td class="pts">${fmtPts(p.pts)}</td><td class="minor">${p.tied ? p.tiedWins : ""}</td><td class="minor">${fmtPts(p.sb)}</td><td class="minor">${p.wins}</td><td class="minor">${p.played}</td></tr>`;
+  });
+  t.innerHTML = html + "</tbody>";
+}
+
+function roundStats(r) {
+  let done = 0, live = 0;
+  r.ids.forEach((id) => {
+    const g = state.games.get(id);
+    if (!g) return;
+    if (g.result) done++; else live++;
+  });
+  return { done, live, total: r.slots.length, waiting: r.slots.filter((x) => !x.id).length };
+}
+
+// A game whose players or colours differ from its slot in the schedule.
+function mismatchText(slot, g) {
+  const kind = scheduleMismatch(slot, g);
+  if (!kind) return "";
+  const want = `${nameOf(slot.white)} (white) against ${nameOf(slot.black)} (black)`;
+  if (kind === "reversed") return `Colours are reversed: the schedule has ${want}.`;
+  return `This is not the scheduled game: the schedule has ${want}.`;
+}
+
+function scheduleNotice() {
+  const issues = [];
+  rounds.forEach((r) => r.slots.forEach((slot) => {
+    const msg = mismatchText(slot, slot.id && state.games.get(slot.id));
+    if (msg) issues.push(`${r.name}, game ${slot.id}: ${msg}`);
+  }));
+  return issues.join(" ");
+}
+
+function renderTabs() {
+  const el = document.getElementById("tabs");
+  el.innerHTML = rounds.map((r, i) => {
+    const st = roundStats(r);
+    const count = r.slots.length ? `<span class="count">${st.done}/${st.total}</span>` : "";
+    return `<button type="button" role="tab" aria-selected="${i === state.round}" data-r="${i}">${esc(r.name)}${count}</button>`;
+  }).join("");
+}
+
+// The export gives each player's rating at the start of the game.
+function ratingHTML(p) {
+  if (p.rating == null) return "";
+  return ` <span class="rt">(${p.rating}${p.provisional ? "?" : ""})</span>`;
+}
+
+function sideHTML(p, color, g) {
+  const toMove = !g.result && g.turn === color;
+  let score = "";
+  if (g.result && g.result !== "void") {
+    score = g.result === "½-½" ? "½" : (color === "white") === (g.result === "1-0") ? "1" : "0";
+  }
+  return `<div class="side${toMove ? " to-move" : ""}${score === "0" ? " lost" : ""}"><span class="chip ${color[0]}"></span><span class="nm">${esc(displayName(p))}${ratingHTML(p)}</span><span class="sc">${score}</span></div>`;
+}
+
+function plainSideHTML(id, color) {
+  return `<div class="side"><span class="chip ${color[0]}"></span><span class="nm">${esc(nameOf(id))}</span></div>`;
+}
+
+function statusText(g) {
+  if (g.result === "void") return "Aborted. This game does not count.";
+  const moveNo = Math.ceil(g.moves.length / 2);
+  if (g.result) {
+    const why = REASONS[g.status] || "finished";
+    return `<b>${g.result}</b> by ${why}, ${plural(moveNo, "move")}`;
+  }
+  if (!g.moves.length) return "<b>Not started.</b> White to make the first move.";
+  const who = displayName(g.turn === "white" ? g.white : g.black);
+  const left = leftHTML(g);
+  return `<b>${esc(who)} to move</b>${left ? `, ${left}` : ""}<br>Move ${g.turn === "white" ? moveNo + 1 : moveNo}, last move ${ago(g.lastMoveAt)}`;
+}
+
+function renderGames() {
+  const r = rounds[state.round];
+  const el = document.getElementById("games");
+  const meta = document.getElementById("round-meta");
+  if (!r) { el.innerHTML = ""; meta.textContent = ""; return; }
+  if (!r.slots.length) {
+    meta.textContent = "";
+    el.innerHTML = `<div class="empty">No games added for ${esc(r.name)} yet. Add them to this round in tournament.json, for example <code>{ "white": "user1", "black": "user2", "id": "AbCd1234" }</code>.</div>`;
+    return;
+  }
+  const st = roundStats(r);
+  meta.textContent = `${st.done} of ${st.total} games finished` + (st.live ? `, ${st.live} in progress` : "") +
+    (st.waiting ? `, ${st.waiting} not started yet` : "");
+  el.innerHTML = r.slots.map((slot) => {
+    const g = slot.id && state.games.get(slot.id);
+    if (!g) {
+      let status = "<b>Not started yet.</b>";
+      if (slot.id) status = `Game <b>${esc(slot.id)}</b> ${notFound.has(slot.id) ? "was not found on Lichess. Check the ID." : "is loading…"}`;
+      return `<div class="game pending" aria-disabled="true">
+        ${plainSideHTML(slot.black, "black")}
+        ${boardHTML(START_FEN, null)}
+        ${plainSideHTML(slot.white, "white")}
+        <div class="status">${status}</div>
+      </div>`;
+    }
+    const mismatch = mismatchText(slot, g);
+    return `<div class="game" role="button" tabindex="0" data-id="${esc(g.id)}" aria-label="${esc(displayName(g.white))} against ${esc(displayName(g.black))}, open game">
+      ${sideHTML(g.black, "black", g)}
+      ${boardHTML(g.fen, g.last)}
+      ${sideHTML(g.white, "white", g)}
+      <div class="status">${statusText(g)}</div>
+      ${mismatch ? `<div class="status warn">${esc(mismatch)}</div>` : ""}
+    </div>`;
+  }).join("");
+}
+
+// A message replaces "Updated …" and stays until the next renderSync().
+let syncMsg = "";
+function renderSync(msg = "") {
+  syncMsg = msg;
+  const text = msg || (state.lastUpdate ? `Updated ${ago(state.lastUpdate)}` : "Loading games…");
+  document.getElementById("sync").classList.toggle("stale", !!msg);
+  document.getElementById("sync-text").innerHTML = `<span class="dot"></span>${esc(text)}`;
+}
+
+function renderNotice() {
+  const el = document.getElementById("notice");
+  const msg = Object.values(notices).filter(Boolean).join(" ");
+  el.hidden = !msg;
+  el.textContent = msg;
+}
+
+function renderAll() {
+  notices.schedule = scheduleNotice();
+  renderNotice();
+  renderStandings();
+  renderTabs();
+  renderGames();
+  if (state.open) renderDialog();
+  else if (state.player) renderPlayer();
+}
+
+// ---------- game dialog ----------
+function buildPositions(g) {
+  if (g.positions) return g.positions;
+  if (!Chess) return [{ fen: g.fen, last: g.last }];
+  const c = new Chess();
+  const list = [{ fen: c.fen(), last: null }];
+  for (const san of g.moves) {
+    const m = tryMove(c, san);
+    if (!m) break;
+    list.push({ fen: c.fen(), last: [m.from, m.to] });
+  }
+  return list;
+}
+
+function openGame(id, back) {
+  const g = state.games.get(id);
+  if (!g) return;
+  state.player = null;
+  // renderDialog() fills in the positions and moves to the latest one.
+  state.open = { id, positions: [], ply: -1, back: back || null };
+  renderDialog();
+  const d = document.getElementById("dlg");
+  if (!d.open) d.showModal();
+}
+
+function renderDialog() {
+  const { id } = state.open;
+  const g = state.games.get(id);
+  if (!g) return;
+  // Keep up with new moves if the viewer was on the latest one.
+  const fresh = buildPositions(g);
+  if (fresh.length !== state.open.positions.length) {
+    const atEnd = state.open.ply === state.open.positions.length - 1;
+    state.open.positions = fresh;
+    state.open.ply = atEnd ? fresh.length - 1 : Math.min(state.open.ply, fresh.length - 1);
+  }
+  const ply = state.open.ply;
+  const cur = state.open.positions[ply];
+  const rName = rounds.find((r) => r.ids.includes(id))?.name || "";
+
+  let movesHTML = '<div class="moves" id="moves">';
+  for (let i = 0; i < g.moves.length; i += 2) {
+    movesHTML += `<div class="no">${i / 2 + 1}.</div>`;
+    for (const j of [i, i + 1]) {
+      if (j < g.moves.length) movesHTML += `<button type="button" class="move${ply === j + 1 ? " cur" : ""}" data-ply="${j + 1}">${esc(g.moves[j])}</button>`;
+      else movesHTML += "<span></span>";
+    }
+  }
+  if (!g.moves.length) movesHTML += '<div class="no"></div><span class="none">No moves yet</span>';
+  movesHTML += "</div>";
+
+  const d = document.getElementById("dlg");
+  d.innerHTML = `<div class="dlg">
+    <div class="head">
+      <div>
+        <h3 id="dlg-title">${esc(displayName(g.white))} against ${esc(displayName(g.black))}</h3>
+        <p>${esc(rName)}${g.daysPerTurn ? `, ${plural(g.daysPerTurn, "day")} per move` : ""}</p>
+      </div>
+      <div class="actions">
+        ${state.open.back ? `<button type="button" data-act="back">← ${esc(nameOf(state.open.back))}</button>` : ""}
+        <button type="button" data-act="close">Close</button>
+      </div>
+    </div>
+    <div>
+      ${sideHTML(g.black, "black", g)}
+      <div class="dlg-board" id="dlg-board">${boardHTML(cur.fen, cur.last)}</div>
+      ${sideHTML(g.white, "white", g)}
+      <div class="controls">
+        <button type="button" data-act="first" aria-label="First position">⏮</button>
+        <button type="button" data-act="prev" aria-label="Previous move">◀</button>
+        <button type="button" data-act="next" aria-label="Next move">▶</button>
+        <button type="button" data-act="last" aria-label="Latest position">⏭</button>
+      </div>
+      <p class="keys">← → or mouse wheel to step through moves, Home and End for the start and latest position.</p>
+    </div>
+    <div class="side-panel">
+      <div class="status">${statusText(g)}</div>
+      ${g.opening ? `<div class="opening">${esc(g.opening)}</div>` : ""}
+      ${movesHTML}
+      <a href="https://lichess.org/${esc(g.id)}" target="_blank" rel="noopener">Open on Lichess</a>
+    </div>
+  </div>`;
+  const curBtn = d.querySelector(".move.cur");
+  if (curBtn) curBtn.scrollIntoView({ block: "nearest" });
+}
+
+function step(to) {
+  const o = state.open;
+  if (!o) return;
+  const ply = Math.max(0, Math.min(o.positions.length - 1, to));
+  if (ply === o.ply) return;
+  o.ply = ply;
+  const d = document.getElementById("dlg");
+  const cur = o.positions[ply];
+  d.querySelector("#dlg-board").innerHTML = boardHTML(cur.fen, cur.last);
+  d.querySelectorAll(".move.cur").forEach((b) => b.classList.remove("cur"));
+  const btn = d.querySelector(`.move[data-ply="${ply}"]`);
+  if (btn) { btn.classList.add("cur"); btn.scrollIntoView({ block: "nearest" }); }
+  else { const list = d.querySelector("#moves"); if (list && ply === 0) list.scrollTop = 0; }
+}
+
+// ---------- player view ----------
+const signed = (n, digits = 0) => (n > 0 ? "+" : n < 0 ? "−" : "±") + Math.abs(n).toFixed(digits);
+
+function openPlayer(pid) {
+  state.open = null;
+  state.player = pid;
+  renderPlayer();
+  const d = document.getElementById("dlg");
+  if (!d.open) d.showModal();
+  d.scrollTop = 0;
+}
+
+function tile(k, v, s, cls) {
+  return `<div class="tile"><div class="k">${k}</div><div class="v${cls ? " " + cls : ""}">${v}</div><div class="s">${s}</div></div>`;
+}
+
+function renderPlayer() {
+  const pid = state.player;
+  const table = standings();
+  const rank = table.findIndex((p) => p.id === pid);
+  const row = table[rank];
+  if (!row) return;
+  const list = playerGames(pid, rounds, state.games);
+  const st = playerStats(list, roster, scoring);
+  const nm = displayName(row);
+  const firstGame = [...list].sort((a, b) => (a.g.createdAt || 0) - (b.g.createdAt || 0))[0];
+  const startRating = firstGame?.me.rating ?? null;
+  const toPlay = rounds.flatMap((r) => r.slots
+    .filter((x) => !x.id && (x.white === pid || x.black === pid))
+    .map((x) => {
+      const color = x.white === pid ? "white" : "black";
+      const opp = x.white === pid ? x.black : x.white;
+      return `<li><span class="chip ${color[0]}" title="With ${color}"></span>${esc(r.name)} · <b>${esc(nameOf(opp))}</b></li>`;
+    }));
+  const cfgP = roster.get(pid) || {};
+  const seed = cfgP.seed ?? null;
+  const moved = seed != null ? seed - (rank + 1) : 0;
+  const pct = st.n ? Math.round((st.frac / st.n) * 100) : null;
+  const colorLine = (c) => `With ${c}: ` + (st[c].n ? `<b>${fmtPts(st[c].pts)} of ${st[c].n}</b>` : "no finished games");
+  const now = `now ${ordinal(rank + 1)}`;
+
+  const tiles = [
+    tile("Rank", `${rank + 1}<small>/${table.length}</small>`, `${row.tied ? `TW ${row.tiedWins} · ` : ""}SB ${fmtPts(row.sb)} · ${plural(row.wins, "win")}`),
+    seed != null ? tile("Seed", seed, moved ? `${now}, ${moved > 0 ? "up" : "down"} ${plural(Math.abs(moved), "place")}` : `${now}, as seeded`, moved > 0 ? "up" : "") : "",
+    tile("Points", fmtPts(st.pts), st.n ? `from ${plural(st.n, "finished game")}, ${pct}%` : "no finished games yet"),
+    tile("Won · drawn · lost", `${st.w} · ${st.d} · ${st.l}`, st.live ? `${st.live} in progress` : "none in progress"),
+    tile("Performance", st.perf != null ? st.perf : "—", st.avgOpp != null ? `average opponent ${st.avgOpp} (seed ratings)` : "needs a finished game"),
+    tile("Rating change", st.diffN ? signed(st.diff) : "—", startRating != null ? `${startRating} at the first game` : "no rated games yet", st.diff > 0 ? "up" : ""),
+    tile("Against expectation", st.expN ? signed(st.frac - st.exp, 1) : "—", st.expN ? `expected ${st.exp.toFixed(1)} from seed ratings` : "needs a finished game", st.frac - st.exp > 0.05 && st.expN ? "up" : ""),
+  ].join("");
+
+  const rowsHTML = list.map(({ g, round, color, me, opp, score }) => {
+    let res, note;
+    if (g.result === "void") { res = "—"; note = "Aborted, does not count"; }
+    else if (score === null) {
+      res = '<span class="live">● live</span>';
+      const left = leftHTML(g);
+      note = !g.moves.length ? "Not started" : `${esc(displayName(g.turn === color ? me : opp))} to move, ${left ? `${left}, ` : ""}last move ${ago(g.lastMoveAt)}`;
+    } else {
+      res = score === 1 ? "1" : score === 0 ? "0" : "½";
+      note = `${REASONS[g.status] || "finished"}${g.opening ? ", " + esc(g.opening) : ""}`;
+      note = note[0].toUpperCase() + note.slice(1);
+    }
+    const diff = me.ratingDiff != null ? signed(me.ratingDiff) : "";
+    return `<tr tabindex="0" data-game="${esc(g.id)}">
+      <td>${esc(round)}</td>
+      <td class="opp"><span class="chip ${color[0]}" title="Played with ${color}"></span>${esc(displayName(opp))}${ratingHTML(opp)}</td>
+      <td class="r">${res}</td>
+      <td class="num">${diff}</td>
+      <td class="num">${Math.ceil(g.moves.length / 2)}</td>
+      <td class="note">${note}</td>
+    </tr>`;
+  }).join("");
+
+  const d = document.getElementById("dlg");
+  d.innerHTML = `<div class="dlg pdlg">
+    <div class="head">
+      <div>
+        <h3 id="dlg-title">${esc(nm)}</h3>
+        <p>${cfgP.seedRating != null ? `Seed rating ${cfgP.seedRating}${cfgP.seedBasis ? ` (${esc(cfgP.seedBasis)})` : ""} · ` : ""}<a href="https://lichess.org/@/${esc(row.username)}" target="_blank" rel="noopener">${esc(row.username)} on Lichess</a></p>
+      </div>
+      <div class="actions"><button type="button" data-act="close" autofocus>Close</button></div>
+    </div>
+    <div class="tiles">${tiles}</div>
+    <p class="facts">${colorLine("white")} · ${colorLine("black")}</p>
+    ${toPlay.length ? `<div><h4>Still to play</h4><ul class="upcoming">${toPlay.join("")}</ul></div>` : list.length ? '<p class="facts">Has played every opponent.</p>' : ""}
+    <div>
+      <h4>Games</h4>
+      ${list.length ? `<div class="table-scroll"><table class="pgames">
+        <thead><tr><th>Round</th><th>Opponent</th><th class="r">Result</th><th class="num">Rating</th><th class="num">Moves</th><th>Notes</th></tr></thead>
+        <tbody>${rowsHTML}</tbody></table></div>` : '<p class="facts">No games yet.</p>'}
+    </div>
+    <p class="facts fine">Ratings next to names are Lichess correspondence ratings at the start of each game. Performance and expected score use the seed ratings, each player's fixed rating for the tournament, because many Lichess correspondence ratings here are still provisional. Performance is Lichess's tournament performance over finished games: the average of each opponent's rating, plus 500 for a win and minus 500 for a loss. Rating change adds up what Lichess awarded for the finished games in this tournament.</p>
+  </div>`;
+}
+
+// ---------- events ----------
+document.getElementById("tabs").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-r]");
+  if (!b) return;
+  state.round = +b.dataset.r;
+  renderTabs(); renderGames();
+});
+document.getElementById("cross").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-player]");
+  if (b) openPlayer(b.dataset.player);
+});
+document.getElementById("games").addEventListener("click", (e) => {
+  const c = e.target.closest(".game[data-id]");
+  if (c) openGame(c.dataset.id);
+});
+document.getElementById("games").addEventListener("keydown", (e) => {
+  const c = e.target.closest(".game[data-id]");
+  if (c && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openGame(c.dataset.id); }
+});
+const dlg = document.getElementById("dlg");
+dlg.addEventListener("click", (e) => {
+  if (e.target === dlg) { dlg.close(); return; }
+  const tr = e.target.closest("tr[data-game]");
+  if (tr) return openGame(tr.dataset.game, state.player);
+  const b = e.target.closest("button");
+  if (!b) return;
+  if (b.dataset.ply) return step(+b.dataset.ply);
+  const o = state.open;
+  switch (b.dataset.act) {
+    case "close": dlg.close(); break;
+    case "back": openPlayer(o.back); break;
+    case "first": step(0); break;
+    case "prev": step(o.ply - 1); break;
+    case "next": step(o.ply + 1); break;
+    case "last": step(Infinity); break;
+  }
+});
+dlg.addEventListener("keydown", (e) => {
+  const tr = e.target.closest("tr[data-game]");
+  if (tr && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openGame(tr.dataset.game, state.player); }
+});
+// Listen on the document: the dialog is re-rendered on refresh, which can drop focus out of it.
+document.addEventListener("keydown", (e) => {
+  const o = state.open;
+  if (!o || !dlg.open || e.altKey || e.ctrlKey || e.metaKey) return;
+  const to = { ArrowLeft: o.ply - 1, ArrowRight: o.ply + 1, Home: 0, End: Infinity }[e.key];
+  if (to === undefined) return;
+  e.preventDefault();
+  step(to);
+});
+// Wheel anywhere in the dialog except the move list, which scrolls normally.
+// Deltas are accumulated so a touchpad doesn't race through the game.
+let wheelAcc = 0, wheelAt = 0;
+dlg.addEventListener("wheel", (e) => {
+  const o = state.open;
+  if (!o || e.target.closest("#moves") || e.ctrlKey) return;
+  e.preventDefault();
+  const now = Date.now();
+  if (now - wheelAt > 300) wheelAcc = 0;
+  wheelAt = now;
+  wheelAcc += e.deltaMode === 1 ? e.deltaY * 40 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
+  while (Math.abs(wheelAcc) >= 50) {
+    const dir = Math.sign(wheelAcc);
+    wheelAcc -= dir * 50;
+    step(o.ply + dir);
+  }
+}, { passive: false });
+dlg.addEventListener("close", () => { state.open = null; state.player = null; });
+document.getElementById("refresh").addEventListener("click", () => refresh(true));
+
+// ---------- refresh loop ----------
+const FILE_HINT = " Browsers don't let a page opened straight from disk read other files. Serve the folder instead, for example with python3 -m http.server, and open http://localhost:8000/tournament.html.";
+const RATE_PAUSE_MS = 120000, DEFAULT_REFRESH_S = 300, MIN_REFRESH_S = 20;
+let busy = false, retryTimer = null;
+async function refresh(manual) {
+  if (busy) return;
+  busy = true;
+  try {
+    try {
+      if (await loadConfig()) renderAll();
+      notices.config = "";
+    } catch (err) {
+      notices.config = `Could not read tournament.json. ${err.message || ""}` +
+        (location.protocol === "file:" ? FILE_HINT : "") +
+        (config ? " Showing the last version that loaded." : "");
+    }
+    renderNotice();
+    if (!config) { renderSync("No tournament data"); return; }
+    if (!allIds.length) { renderSync("No games added yet"); return; }
+    // Show what we already have (cached finished games, earlier fetches) right away.
+    if (!state.lastUpdate) { showGames(); renderAll(); }
+    if (!manual && Date.now() < state.pausedUntil) return;
+    renderSync("Updating…");
+    for (const id of allIds.filter((id) => !finishedCache[id])) {
+      const raw = await fetchGame(id);
+      if (!raw) { notFound.add(id); continue; }
+      notFound.delete(id);
+      cacheFinished(raw);
+      if (finishedCache[id]) liveGames.delete(id); else liveGames.set(id, raw);
+    }
+    showGames();
+    state.lastUpdate = Date.now();
+    notices.fetch = "";
+    renderNotice();
+    renderSync();
+    renderAll();
+    await updateHistories();
+  } catch (err) {
+    showGames();
+    renderAll();
+    if (err.rate) {
+      state.pausedUntil = Date.now() + RATE_PAUSE_MS;
+      clearTimeout(retryTimer);
+      retryTimer = setTimeout(refresh, RATE_PAUSE_MS);
+      renderSync("Lichess asked us to slow down. Retrying in 2 minutes.");
+    } else {
+      renderSync("Update failed");
+      notices.fetch = `Could not load games from Lichess. ${err.message || ""} The page will try again automatically. If this keeps happening, check your network connection and the game IDs.`;
+      renderNotice();
+    }
+  } finally {
+    busy = false;
+  }
+}
+
+function showGames() {
+  const games = allIds.map((id) => finishedCache[id] || liveGames.get(id)).filter(Boolean);
+  state.games = new Map(games.map((g) => [g.id, withHistory(summarize(g))]));
+}
+
+// ---------- start ----------
+renderAll();
+refresh();
+(function loop() {
+  const secs = Math.max(MIN_REFRESH_S, config?.refreshSeconds || DEFAULT_REFRESH_S);
+  setTimeout(() => { if (!document.hidden) refresh(); loop(); }, secs * 1000);
+})();
+setInterval(() => {
+  tickDeadlines();
+  if (state.lastUpdate && !busy && !syncMsg) renderSync();
+}, 15000);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && (!state.lastUpdate || Date.now() - state.lastUpdate > 30000)) refresh();
+});
 </script>
 </body>
 </html>
