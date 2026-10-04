@@ -254,6 +254,7 @@ table.pgames { border-collapse: collapse; width: 100%; font-size: 14.5px; font-v
 .upcoming b { color: var(--ink); font-weight: 600; }
 
 footer { color: var(--muted); font-size: 13.5px; border-top: 1px solid var(--line); padding-top: 16px; }
+footer a { color: inherit; text-underline-offset: 2px; }
 
 @media (max-width: 720px) {
   .wrap { padding: 20px 14px 48px; }
@@ -316,7 +317,7 @@ footer { color: var(--muted); font-size: 13.5px; border-top: 1px solid var(--lin
     <div class="games" id="games"></div>
   </section>
 
-  <footer>This page shows positions and moves only. There is no engine or evaluation anywhere on it, by design. Game data comes from Lichess and refreshes automatically.</footer>
+  <footer>This page shows positions and moves only. There is no engine or evaluation anywhere on it, by design. Game data comes from Lichess and refreshes automatically. Made with <a href="https://github.com/csaavedra/lichess-league">lichess-league</a>.</footer>
 </div>
 
 <dialog id="dlg" aria-labelledby="dlg-title"></dialog>
