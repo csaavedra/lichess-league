@@ -6,7 +6,7 @@ import {
   computeStandings, scheduleMismatch, ratedMismatch, playerGames, playerStats,
 } from "./lib.js";
 
-// players: [[username, seed, seedRating]] -> the page's configNames map.
+// players: [[username, seed, seedRating]] -> the page's roster map.
 function playersMap(list) {
   return new Map(list.map(([u, seed, seedRating]) => [u, { username: u, name: u.toUpperCase(), seed, seedRating: seedRating ?? null }]));
 }

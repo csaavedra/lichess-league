@@ -58,4 +58,5 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
 port = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
 print(f"Demo scenarios at http://localhost:{port}/demo/")
-http.server.ThreadingHTTPServer(("", port), Handler).serve_forever()
+# Local only: the server hands out the whole checkout, theme/ and tournament.json included.
+http.server.ThreadingHTTPServer(("localhost", port), Handler).serve_forever()

@@ -20,7 +20,7 @@ The page reads `tournament.json` next to it, so it has to be served over
 HTTP (browsers block reading it from `file://`):
 
     cp tournament.example.json tournament.json
-    python3 -m http.server 8000
+    python3 -m http.server --bind localhost 8000
 
 Then open http://localhost:8000/tournament.html.
 
