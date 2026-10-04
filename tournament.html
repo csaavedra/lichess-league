@@ -867,6 +867,9 @@ function openPlayer(pid) {
   d.scrollTop = 0;
 }
 
+// Which ratings an average used: n games, lichessN of them with a Lichess rating for want of a seed rating.
+const ratingSource = (lichessN, n) => (!lichessN ? "seed ratings" : lichessN === n ? "Lichess ratings" : "seed and Lichess ratings");
+
 function tile(k, v, s, cls) {
   return `<div class="tile"><div class="k">${k}</div><div class="v${cls ? " " + cls : ""}">${v}</div><div class="s">${s}</div></div>`;
 }
@@ -901,9 +904,9 @@ function renderPlayer() {
     seed != null ? tile("Seed", seed, moved ? `${now}, ${moved > 0 ? "up" : "down"} ${plural(Math.abs(moved), "place")}` : `${now}, as seeded`, moved > 0 ? "up" : "") : "",
     tile("Points", fmtPts(st.pts), st.n ? `from ${plural(st.n, "finished game")}, ${pct}%` : "no finished games yet"),
     tile("Won · drawn · lost", `${st.w} · ${st.d} · ${st.l}`, st.live ? `${st.live} in progress` : "none in progress"),
-    tile("Performance", st.perf != null ? st.perf : "—", st.avgOpp != null ? `average opponent ${st.avgOpp} (seed ratings)` : "needs a finished game"),
+    tile("Performance", st.perf != null ? st.perf : "—", st.avgOpp != null ? `average opponent ${st.avgOpp} (${ratingSource(st.oppLichess, st.oppN)})` : "needs a finished game"),
     rated ? tile("Rating change", st.diffN ? signed(st.diff) : "—", startRating != null ? `${startRating} at the first game` : "no rated games yet", st.diff > 0 ? "up" : "") : "",
-    tile("Against expectation", st.expN ? signed(st.frac - st.exp, 1) : "—", st.expN ? `expected ${st.exp.toFixed(1)} from seed ratings` : "needs a finished game", st.frac - st.exp > 0.05 && st.expN ? "up" : ""),
+    tile("Against expectation", st.expN ? signed(st.frac - st.exp, 1) : "—", st.expN ? `expected ${st.exp.toFixed(1)} from ${ratingSource(st.expLichess, st.expN)}` : "needs a finished game", st.frac - st.exp > 0.05 && st.expN ? "up" : ""),
   ].join("");
 
   const rowsHTML = list.map(({ g, round, color, me, opp, score }) => {

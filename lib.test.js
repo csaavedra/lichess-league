@@ -158,6 +158,7 @@ test("performance and expected score from seed ratings", () => {
   assert.deepEqual(all.white, { n: 1, pts: 1 });
   assert.deepEqual(all.black, { n: 1, pts: 1 });
   assert.equal(all.diff, 6);
+  assert.deepEqual([all.oppLichess, all.expLichess], [0, 0]);
 
   const half = statsFor("½-½", "½-½");
   assert.equal(half.perf, 1600);
@@ -181,6 +182,7 @@ test("performance falls back to Lichess ratings and counts live games apart", ()
   assert.equal(st.n, 1);
   assert.equal(st.live, 1);
   assert.ok(Math.abs(st.exp - 1 / (1 + 10 ** (-400 / 400))) < 1e-9);
+  assert.deepEqual([st.oppLichess, st.expLichess], [1, 1]);
 });
 
 test("no performance when an opponent has no rating at all", () => {
@@ -193,6 +195,15 @@ test("no performance when an opponent has no rating at all", () => {
   assert.equal(st.n, 2);
   assert.equal(st.perf, null);
   assert.equal(st.avgOpp, 1500);
+  assert.equal(st.oppLichess, 0); // o2 has no rating at all, so it isn't in the average
+});
+
+test("expected score counts a game with only the player's own Lichess rating", () => {
+  const players = playersMap([["me", 1], ["o1", 2, 1500], ["o2", 3, 1700]]);
+  const { rounds, games } = setup([game("me", "o1", "1-0", { whiteRating: 1600 }), game("o2", "me", "½-½")]);
+  const st = playerStats(playerGames("me", rounds, games), players);
+  assert.deepEqual([st.oppN, st.oppLichess], [2, 0]);
+  assert.deepEqual([st.expN, st.expLichess], [2, 2]);
 });
 
 test("summarize", () => {

@@ -151,7 +151,7 @@ export function playerGames(pid, rounds, games) {
 
 export function playerStats(list, players, sc = DEFAULT_SCORING) {
   const seedRatingOf = (id) => players.get(id)?.seedRating ?? null;
-  const st = { n: 0, w: 0, d: 0, l: 0, frac: 0, pts: 0, exp: 0, expN: 0, oppSum: 0, oppN: 0, perfSum: 0, diff: 0, diffN: 0, live: 0,
+  const st = { n: 0, w: 0, d: 0, l: 0, frac: 0, pts: 0, exp: 0, expN: 0, expLichess: 0, oppSum: 0, oppN: 0, oppLichess: 0, perfSum: 0, diff: 0, diffN: 0, live: 0,
     white: { n: 0, pts: 0 }, black: { n: 0, pts: 0 } };
   list.forEach(({ g, color, me, opp, score }) => {
     if (g.result === "void") return;
@@ -169,9 +169,13 @@ export function playerStats(list, players, sc = DEFAULT_SCORING) {
     const meR = seedRatingOf(me.id) ?? me.rating;
     if (oppR != null) {
       st.oppSum += oppR; st.oppN++;
+      if (seedRatingOf(opp.id) == null) st.oppLichess++;
       // Lichess (as in its Swiss tournaments): opponent's rating, +500 for a win, −500 for a loss.
       st.perfSum += oppR + (score === 1 ? 500 : score === 0 ? -500 : 0);
-      if (meR != null) { st.exp += expected(meR, oppR); st.expN++; }
+      if (meR != null) {
+        st.exp += expected(meR, oppR); st.expN++;
+        if (seedRatingOf(opp.id) == null || seedRatingOf(me.id) == null) st.expLichess++;
+      }
     }
     if (me.ratingDiff != null) { st.diff += me.ratingDiff; st.diffN++; }
   });
