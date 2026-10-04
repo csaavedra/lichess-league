@@ -1,0 +1,221 @@
+// Run with: node --test
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import {
+  DAY_MS, fmtPts, deadlineOf, fmtLeft, extractId, isPrivateId, summarize,
+  computeStandings, scheduleMismatch, playerGames, playerStats,
+} from "./lib.js";
+
+// players: [[username, seed, seedRating]] -> the page's configNames map.
+function playersMap(list) {
+  return new Map(list.map(([u, seed, seedRating]) => [u, { username: u, name: u.toUpperCase(), seed, seedRating: seedRating ?? null }]));
+}
+
+// A Lichess export reduced by summarize(), as the page does.
+// result: "1-0", "0-1", "½-½", "live" or "aborted".
+let nextId = 0;
+function game(white, black, result, extra = {}) {
+  const status = { "1-0": "mate", "0-1": "resign", "½-½": "draw", live: "started", aborted: "aborted" }[result];
+  const winner = { "1-0": "white", "0-1": "black" }[result];
+  const side = (u, rating, ratingDiff) => ({ user: { id: u, name: u }, rating, ratingDiff });
+  return summarize({
+    id: `game${String(nextId++).padStart(4, "0")}`, status, winner,
+    players: { white: side(white, extra.whiteRating ?? 1500, extra.whiteDiff), black: side(black, extra.blackRating ?? 1500, extra.blackDiff) },
+    moves: extra.moves ?? "e4 e5 Nf3",
+    lastMoveAt: extra.lastMoveAt ?? 1000, createdAt: 0, daysPerTurn: extra.daysPerTurn ?? 3,
+  });
+}
+
+// games: list of summaries, all in a single round.
+function setup(games) {
+  return { rounds: [{ name: "Round 1", ids: games.map((g) => g.id) }], games: new Map(games.map((g) => [g.id, g])) };
+}
+
+function standings(players, games) {
+  const { rounds, games: map } = setup(games);
+  return computeStandings(rounds, map, players);
+}
+
+const byId = (rows) => Object.fromEntries(rows.map((p) => [p.id, p]));
+
+test("a 3-way tie is decided by wins against the tied players before SB", () => {
+  // a, b and c finish on 2 points. Only a beat another tied player (c),
+  // although b has the better Sonneborn–Berger and c the better seed.
+  const players = playersMap([["c", 1], ["b", 2], ["a", 3], ["d", 4], ["e", 5], ["f", 6]]);
+  const rows = standings(players, [
+    game("a", "c", "1-0"), game("a", "b", "½-½"), game("b", "c", "½-½"),
+    game("a", "e", "½-½"), game("b", "d", "1-0"), game("c", "d", "1-0"), game("c", "f", "½-½"),
+    game("d", "e", "1-0"), game("d", "f", "½-½"),
+  ]);
+  const p = byId(rows);
+  assert.deepEqual([p.a.pts, p.b.pts, p.c.pts], [2, 2, 2]);
+  assert.deepEqual([p.a.tiedWins, p.b.tiedWins, p.c.tiedWins], [1, 0, 0]);
+  assert.ok(p.b.sb > p.a.sb, "b has the better SB");
+  assert.ok(p.a.tied && p.b.tied && p.c.tied);
+  assert.ok(!p.d.tied);
+  assert.deepEqual(rows.map((r) => r.id), ["a", "b", "c", "d", "f", "e"]);
+});
+
+test("draws between tied players don't count for TW", () => {
+  // a and b drew each other and finish on 1½. TW is 0 for both, so SB decides,
+  // against the seeds.
+  const players = playersMap([["a", 1], ["b", 2], ["c", 3], ["d", 4]]);
+  const rows = standings(players, [
+    game("a", "b", "½-½"), game("a", "d", "1-0"), game("b", "c", "1-0"), game("c", "d", "1-0"),
+  ]);
+  const p = byId(rows);
+  assert.equal(p.a.pts, 1.5);
+  assert.equal(p.b.pts, 1.5);
+  assert.equal(p.a.tiedWins, 0);
+  assert.equal(p.b.tiedWins, 0);
+  assert.equal(p.a.sb, 0.75);
+  assert.equal(p.b.sb, 1.75);
+  assert.deepEqual(rows.map((r) => r.id), ["b", "a", "c", "d"]);
+});
+
+test("TW counts wins against the whole tied group", () => {
+  // a, b and c on 1 point each; a and b each beat one tied player, c beat d.
+  const players = playersMap([["a", 1], ["b", 2], ["c", 3], ["d", 4]]);
+  const p = byId(standings(players, [game("a", "b", "1-0"), game("b", "c", "1-0"), game("c", "d", "1-0")]));
+  assert.deepEqual([p.a.tiedWins, p.b.tiedWins, p.c.tiedWins], [1, 1, 0]);
+});
+
+test("SB leaves out games in progress", () => {
+  // c has 1 point, but a's game against c is still being played.
+  const players = playersMap([["a", 1], ["b", 2], ["c", 3]]);
+  const p = byId(standings(players, [game("a", "b", "1-0"), game("c", "b", "1-0"), game("a", "c", "live")]));
+  assert.equal(p.a.pts, 1);
+  assert.equal(p.c.pts, 1);
+  assert.equal(p.a.sb, 0);
+  assert.equal(p.c.sb, 0);
+  assert.equal(p.a.played, 1);
+  assert.deepEqual(p.a.cells.get("c"), [{ live: true }]);
+});
+
+test("aborted games are ignored", () => {
+  const players = playersMap([["a", 1, 1500], ["b", 2, 1500]]);
+  const aborted = game("a", "b", "aborted");
+  const noStart = summarize({ id: "noStart1", status: "noStart", players: { white: { user: { id: "b", name: "b" } }, black: { user: { id: "a", name: "a" } } } });
+  assert.equal(aborted.result, "void");
+  assert.equal(noStart.result, "void");
+
+  const { rounds, games } = setup([aborted, noStart]);
+  const p = byId(computeStandings(rounds, games, players));
+  assert.equal(p.a.pts, 0);
+  assert.equal(p.a.played, 0);
+  assert.equal(p.a.cells.size, 0);
+
+  const st = playerStats(playerGames("a", rounds, games), players);
+  assert.equal(st.n, 0);
+  assert.equal(st.live, 0);
+  assert.equal(st.perf, null);
+});
+
+test("scores follow the scoring in tournament.json", () => {
+  const players = playersMap([["a", 1], ["b", 2], ["c", 3]]);
+  const { rounds, games } = setup([game("a", "b", "1-0"), game("b", "c", "½-½")]);
+  const p = byId(computeStandings(rounds, games, players, { win: 3, draw: 1, loss: 0 }));
+  assert.equal(p.a.pts, 3);
+  assert.equal(p.b.pts, 1);
+  assert.equal(p.a.sb, 1); // full wins weigh 1, whatever a win is worth
+});
+
+test("unscheduled players still appear, anonymous ones don't", () => {
+  const players = playersMap([["a", 1]]);
+  const anon = summarize({ id: "anon0001", status: "mate", winner: "white", players: { white: { user: { id: "a", name: "A" } }, black: {} } });
+  const rows = standings(players, [game("a", "x", "0-1"), anon]);
+  assert.deepEqual(rows.map((r) => r.id), ["x", "a"]);
+  assert.equal(byId(rows).a.username, "A"); // capitalisation from Lichess
+});
+
+test("performance and expected score from seed ratings", () => {
+  // Opponents seeded 1500 and 1700; average 1600.
+  const players = playersMap([["me", 1, 1600], ["o1", 2, 1500], ["o2", 3, 1700]]);
+  const statsFor = (r1, r2) => {
+    const { rounds, games } = setup([game("me", "o1", r1, { whiteDiff: 10 }), game("o2", "me", r2, { blackDiff: -4 })]);
+    return playerStats(playerGames("me", rounds, games), players);
+  };
+
+  const all = statsFor("1-0", "0-1");
+  assert.equal(all.perf, 2100);
+  assert.equal(all.avgOpp, 1600);
+  assert.deepEqual([all.n, all.w, all.d, all.l, all.pts], [2, 2, 0, 0, 2]);
+  assert.deepEqual(all.white, { n: 1, pts: 1 });
+  assert.deepEqual(all.black, { n: 1, pts: 1 });
+  assert.equal(all.diff, 6);
+
+  const half = statsFor("½-½", "½-½");
+  assert.equal(half.perf, 1600);
+  assert.deepEqual([half.w, half.d, half.l, half.pts], [0, 2, 0, 1]);
+  // Equal-rated-on-average opponents spread evenly: expected exactly 1 of 2.
+  assert.ok(Math.abs(half.exp - 1) < 1e-9);
+
+  const none = statsFor("0-1", "1-0");
+  assert.equal(none.perf, 1100);
+  assert.deepEqual([none.w, none.d, none.l, none.pts], [0, 0, 2, 0]);
+});
+
+test("performance falls back to Lichess ratings and counts live games apart", () => {
+  const players = playersMap([["me", 1], ["o1", 2]]);
+  const { rounds, games } = setup([
+    game("me", "o1", "1-0", { whiteRating: 1800, blackRating: 1400 }),
+    game("o1", "me", "live"),
+  ]);
+  const st = playerStats(playerGames("me", rounds, games), players);
+  assert.equal(st.perf, 1900);
+  assert.equal(st.n, 1);
+  assert.equal(st.live, 1);
+  assert.ok(Math.abs(st.exp - 1 / (1 + 10 ** (-400 / 400))) < 1e-9);
+});
+
+test("schedule checks: reversed colours and wrong players", () => {
+  const slot = { white: "a", black: "b" };
+  assert.equal(scheduleMismatch(slot, game("a", "b", "live")), "");
+  assert.equal(scheduleMismatch(slot, game("b", "a", "live")), "reversed");
+  assert.equal(scheduleMismatch(slot, game("a", "c", "live")), "other");
+  assert.equal(scheduleMismatch(slot, null), "");
+});
+
+test("extractId and the private token check", () => {
+  assert.equal(extractId("AbCd1234"), "AbCd1234");
+  assert.equal(extractId(" https://lichess.org/AbCd1234WxYz?x=1 "), "AbCd1234");
+  assert.equal(extractId("https://lichess.org/AbCd1234/black#12"), "AbCd1234");
+  assert.equal(extractId("abc"), null);
+  assert.equal(extractId("AbCd-234"), null);
+  assert.equal(extractId(""), null);
+  assert.ok(isPrivateId("AbCd1234WxYz"));
+  assert.ok(isPrivateId("https://lichess.org/AbCd1234WxYz"));
+  assert.ok(!isPrivateId("AbCd1234"));
+  assert.ok(!isPrivateId("https://lichess.org/AbCd1234/black"));
+});
+
+test("fmtPts", () => {
+  assert.equal(fmtPts(0), "0");
+  assert.equal(fmtPts(0.5), "½");
+  assert.equal(fmtPts(3), "3");
+  assert.equal(fmtPts(3.5), "3½");
+  assert.equal(fmtPts(1.25), "1.25");
+  assert.equal(fmtPts(2.1), "2.1");
+});
+
+test("time left to move", () => {
+  const MIN = 60000, H = 60 * MIN;
+  assert.equal(fmtLeft(2 * DAY_MS + 8 * H + 59 * MIN), "2 days 8 h left");
+  assert.equal(fmtLeft(DAY_MS), "1 day left");
+  assert.equal(fmtLeft(DAY_MS + 30 * MIN), "1 day left");
+  assert.equal(fmtLeft(23 * H + 59 * MIN + 59999), "23 h 59 min left");
+  assert.equal(fmtLeft(5 * H), "5 h left");
+  assert.equal(fmtLeft(42 * MIN + 30000), "42 min left");
+  assert.equal(fmtLeft(59999), "less than a minute left");
+  assert.equal(fmtLeft(1), "less than a minute left");
+  assert.equal(fmtLeft(0), "out of time");
+  assert.equal(fmtLeft(-5 * H), "out of time");
+});
+
+test("deadline: last move plus days per move, only while a game is being played", () => {
+  assert.equal(deadlineOf(game("a", "b", "live", { lastMoveAt: 1000, daysPerTurn: 3 })), 1000 + 3 * DAY_MS);
+  assert.equal(deadlineOf(game("a", "b", "1-0")), null);
+  assert.equal(deadlineOf(game("a", "b", "½-½")), null);
+  assert.equal(deadlineOf(game("a", "b", "aborted")), null);
+  assert.equal(deadlineOf(game("a", "b", "live", { moves: "" })), null);
+});
