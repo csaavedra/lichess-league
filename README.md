@@ -39,8 +39,8 @@ Then open http://localhost:8000/demo/ and pick one:
 - `halfway`: finished, live and upcoming rounds.
 - `finished`: every game played, with ties in the standings.
 - `problems`: one game for each warning the page shows (reversed colours,
-  wrong players, unrated game, unknown ID, private token, little time
-  left, and more).
+  wrong players, unrated game, wrong time control, unknown ID, private
+  token, little time left, and more).
 - `unrated`: an unrated tournament with two rated games.
 
 Each scenario is a tournament file, `demo/NAME.json`, whose games have an
@@ -64,12 +64,17 @@ on every refresh, so editing it is how you update the tournament.
   `{ "white": username, "black": username, "id": "" }`.
 - `rated`: whether the games should be rated on Lichess (default `true`).
   The page flags a game that isn't set up that way.
+- `timeControl`: the time control the games should have, either
+  `{ "days": 3 }` (days per move) or `{ "minutes": 90, "increment": 30 }`
+  (a clock, with the increment in seconds). The page flags a game with a
+  different one. Without it, any time control is accepted.
 - `scoring`: points for a win, draw and loss (default 1, ½, 0).
 - `refreshSeconds`: how often to poll Lichess (default 300).
 
 Once a game starts on Lichess, put its 8-character ID (or its link, like
 `https://lichess.org/AbCd1234`) in `id`. The page flags a game whose players
-or colours don't match the schedule, or that isn't rated as `rated` says.
+or colours don't match the schedule, or that isn't rated or timed as
+`rated` and `timeControl` say.
 
 > **Only ever paste the first 8 characters.** A player who copies the link
 > from their own game gets a 12-character URL; the last 4 characters are a
@@ -110,8 +115,8 @@ only loads when no theme replaces them.
 
 ## Development
 
-The pure logic (standings, tiebreaks, player stats, ID parsing, time left)
-lives in `lib.js`, with no DOM or network access. Its tests need nothing
+The pure logic (standings, tiebreaks, player stats, ID parsing, time
+control, time left) lives in `lib.js`, with no DOM or network access. Its tests need nothing
 beyond Node 22 or later (`package.json` only marks the files as ES modules;
 there is nothing to install):
 

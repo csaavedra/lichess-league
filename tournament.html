@@ -326,6 +326,7 @@ footer a { color: inherit; text-underline-offset: 2px; }
 import {
   START_FEN, ONGOING, DAY_MS, DEFAULT_SCORING, fmtPts, plural, deadlineOf, fmtLeft, extractId, isPrivateId, summarize,
   computeStandings, scheduleMismatch, ratedMismatch, playerGames, playerStats,
+  parseTimeControl, gameTimeControl, fmtTimeControl, timeControlMismatch,
 } from "./lib.js";
 
 // chess.js is only used to replay the moves of a game. No engine is loaded anywhere on this page.
@@ -377,7 +378,7 @@ function tickDeadlines() {
 
 // ---------- config parsing ----------
 let config = null, configText = null;
-let rounds = [], allIds = [], roster = new Map(), scoring = DEFAULT_SCORING, rated = true;
+let rounds = [], allIds = [], roster = new Map(), scoring = DEFAULT_SCORING, rated = true, timeControl = null;
 const notices = { config: "", ids: "", schedule: "", fetch: "" };
 const liveGames = new Map(); // id -> latest export of a game not finished yet
 const notFound = new Set();
@@ -419,6 +420,8 @@ function applyConfig(cfg) {
   );
   scoring = { ...DEFAULT_SCORING, ...cfg.scoring };
   rated = cfg.rated !== false;
+  const tcSetting = parseTimeControl(cfg.timeControl);
+  timeControl = tcSetting.tc;
 
   const title = cfg.title || "Correspondence round-robin";
   document.getElementById("title").textContent = title;
@@ -436,6 +439,7 @@ function applyConfig(cfg) {
   if (unknown.length) warnings.push(`These usernames appear in the schedule in tournament.json but not in its players list: ${unknown.map((u) => u || "(empty)").join(", ")}.`);
   if (privateIds.length) warnings.push(`These game IDs in tournament.json include a player's private token: ${privateIds.join(", ")}. Keep only their first 8 characters. The extra 4 let anyone move for that player, and should never be shared.`);
   if (badIds.length) warnings.push(`These entries in tournament.json are not valid Lichess game IDs and were skipped: ${badIds.join(", ")}.`);
+  if (tcSetting.error) warnings.push(tcSetting.error);
   notices.ids = warnings.join(" ");
 }
 
@@ -541,14 +545,14 @@ async function updateHistories() {
 
 // Finished games never change, so keep them in this browser and only ask
 // Lichess for games still in progress (or not seen yet).
-const CACHE_KEY = "tournament:finished-games:v2";
+const CACHE_KEY = "tournament:finished-games:v3";
 const finishedCache = (() => {
   try { return JSON.parse(localStorage.getItem(CACHE_KEY)) || {}; } catch { return {}; }
 })();
 function cacheFinished(g) {
   if (ONGOING.has(g.status)) return;
-  const { id, rated, status, winner, players, moves, lastFen, lastMove, lastMoveAt, createdAt, opening, daysPerTurn } = g;
-  finishedCache[id] = { id, rated, status, winner, players, moves, lastFen, lastMove, lastMoveAt, createdAt, opening, daysPerTurn };
+  const { id, rated, status, winner, players, moves, lastFen, lastMove, lastMoveAt, createdAt, opening, daysPerTurn, clock } = g;
+  finishedCache[id] = { id, rated, status, winner, players, moves, lastFen, lastMove, lastMoveAt, createdAt, opening, daysPerTurn, clock };
   try { localStorage.setItem(CACHE_KEY, JSON.stringify(finishedCache)); } catch { /* storage full or blocked */ }
 }
 
@@ -637,7 +641,7 @@ function currentRound() {
 }
 
 // A game whose players or colours differ from its slot in the schedule,
-// or that isn't rated the way the tournament is.
+// or that isn't rated or timed the way the tournament is.
 function mismatchText(slot, g) {
   const msgs = [];
   const kind = scheduleMismatch(slot, g);
@@ -645,6 +649,7 @@ function mismatchText(slot, g) {
   if (kind === "reversed") msgs.push(`Colours are reversed: the schedule has ${want}.`);
   else if (kind) msgs.push(`This is not the scheduled game: the schedule has ${want}.`);
   if (ratedMismatch(rated, g)) msgs.push(rated ? "This game is unrated: the tournament is rated." : "This game is rated: the tournament is unrated.");
+  if (timeControlMismatch(timeControl, g)) msgs.push(`This game has ${fmtTimeControl(gameTimeControl(g))}: the tournament has ${fmtTimeControl(timeControl)}.`);
   return msgs.join(" ");
 }
 
@@ -822,7 +827,7 @@ function renderDialog() {
     <div class="head">
       <div>
         <h3 id="dlg-title">${esc(displayName(g.white))} against ${esc(displayName(g.black))}</h3>
-        <p>${esc(rName)}${g.daysPerTurn ? `, ${plural(g.daysPerTurn, "day")} per move` : ""}</p>
+        <p>${esc(rName)}, ${fmtTimeControl(gameTimeControl(g))}</p>
       </div>
       <div class="actions">
         ${state.open.back ? `<button type="button" data-act="back">← ${esc(nameOf(state.open.back))}</button>` : ""}
