@@ -278,6 +278,8 @@ test("time control checks: the game must match the tournament's", () => {
   assert.equal(timeControlMismatch({ days: 3 }, fast), true);
   assert.equal(timeControlMismatch({ days: 3 }, unlimited), true);
   assert.equal(timeControlMismatch({ minutes: 90, increment: 30 }, fast), false);
+  const quarter = game("a", "b", "live", { daysPerTurn: null, clock: { initial: 15, increment: 0, totalTime: 15 } });
+  assert.equal(timeControlMismatch({ minutes: 0.25, increment: 0 }, quarter), false);
   assert.equal(timeControlMismatch({ minutes: 90, increment: 0 }, fast), true);
   assert.equal(timeControlMismatch({ minutes: 90, increment: 30 }, corr), true);
   assert.equal(timeControlMismatch(null, corr), false);
