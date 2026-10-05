@@ -140,7 +140,7 @@ export const ratedMismatch = (rated, g) => !!g && g.rated !== rated;
 // Returns { tc, error }: tc is null when there is no setting, or it's invalid.
 export function parseTimeControl(raw) {
   if (raw == null) return { tc: null, error: "" };
-  const bad = (why) => ({ tc: null, error: `The timeControl in tournament.json ${why}, so the page doesn't check the games' time control.` });
+  const bad = (why) => ({ tc: null, error: `The timeControl in tournament.json ${why}, so the page ignores it.` });
   if (typeof raw !== "object" || Array.isArray(raw)) return bad('should look like { "days": 3 } or { "minutes": 90, "increment": 30 }');
   const { days, minutes, increment = 0 } = raw;
   if (days != null && minutes != null) return bad('has both "days" and "minutes"');

@@ -727,7 +727,7 @@ function renderGames() {
     if (!g) {
       let status = "<b>Not started yet.</b>";
       if (slot.id) status = `Game <b>${esc(slot.id)}</b> ${notFound.has(slot.id) ? "was not found on Lichess. Check the ID." : "is loading…"}`;
-      return `<div class="game pending" aria-disabled="true">
+      return `<div class="game pending">
         ${plainSideHTML(slot.black, "black")}
         ${boardHTML(START_FEN, null)}
         ${plainSideHTML(slot.white, "white")}
