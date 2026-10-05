@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   START_FEN, DAY_MS, fmtPts, plural, deadlineOf, fmtLeft, extractId, isPrivateId, summarize,
   computeStandings, scheduleMismatch, ratedMismatch, playerGames, playerStats,
+  parseTimeControl, gameTimeControl, fmtTimeControl, timeControlMismatch,
 } from "./lib.js";
 
 // players: [[username, seed, seedRating]] -> the page's roster map.
@@ -22,7 +23,8 @@ function game(white, black, result, extra = {}) {
     id: `game${String(nextId++).padStart(4, "0")}`, status, winner, rated: extra.rated ?? true,
     players: { white: side(white, extra.whiteRating ?? 1500, extra.whiteDiff), black: side(black, extra.blackRating ?? 1500, extra.blackDiff) },
     moves: extra.moves ?? "e4 e5 Nf3",
-    lastMoveAt: extra.lastMoveAt ?? 1000, createdAt: 0, daysPerTurn: extra.daysPerTurn ?? 3,
+    lastMoveAt: extra.lastMoveAt ?? 1000, createdAt: 0,
+    daysPerTurn: "daysPerTurn" in extra ? extra.daysPerTurn : 3, clock: extra.clock,
   });
 }
 
@@ -248,6 +250,44 @@ test("rated checks: the game must be rated the way the tournament is", () => {
   assert.equal(ratedMismatch(false, game("a", "b", "live", { rated: false })), false);
   assert.equal(ratedMismatch(false, game("a", "b", "live")), true);
   assert.equal(ratedMismatch(true, null), false);
+});
+
+test("parseTimeControl: days or a clock, anything else is an error", () => {
+  assert.deepEqual(parseTimeControl(undefined), { tc: null, error: "" });
+  assert.deepEqual(parseTimeControl({ days: 3 }).tc, { days: 3 });
+  assert.deepEqual(parseTimeControl({ minutes: 90, increment: 30 }).tc, { minutes: 90, increment: 30 });
+  assert.deepEqual(parseTimeControl({ minutes: 10 }).tc, { minutes: 10, increment: 0 });
+  for (const bad of [3, "3 days", [], {}, { days: 0 }, { days: 2.5 }, { days: "3" }, { days: 3, minutes: 10 },
+    { minutes: 0 }, { minutes: -5 }, { minutes: 10, increment: -1 }, { minutes: 10, increment: "5" }]) {
+    const { tc, error } = parseTimeControl(bad);
+    assert.equal(tc, null, JSON.stringify(bad));
+    assert.match(error, /timeControl/, JSON.stringify(bad));
+  }
+});
+
+test("time control checks: the game must match the tournament's", () => {
+  const corr = game("a", "b", "live");
+  const fast = game("a", "b", "live", { daysPerTurn: null, clock: { initial: 5400, increment: 30, totalTime: 6600 } });
+  const unlimited = game("a", "b", "live", { daysPerTurn: null });
+  assert.deepEqual(gameTimeControl(corr), { days: 3 });
+  assert.deepEqual(gameTimeControl(fast), { minutes: 90, increment: 30 });
+  assert.equal(gameTimeControl(unlimited), null);
+
+  assert.equal(timeControlMismatch({ days: 3 }, corr), false);
+  assert.equal(timeControlMismatch({ days: 5 }, corr), true);
+  assert.equal(timeControlMismatch({ days: 3 }, fast), true);
+  assert.equal(timeControlMismatch({ days: 3 }, unlimited), true);
+  assert.equal(timeControlMismatch({ minutes: 90, increment: 30 }, fast), false);
+  assert.equal(timeControlMismatch({ minutes: 90, increment: 0 }, fast), true);
+  assert.equal(timeControlMismatch({ minutes: 90, increment: 30 }, corr), true);
+  assert.equal(timeControlMismatch(null, corr), false);
+  assert.equal(timeControlMismatch({ days: 3 }, null), false);
+
+  assert.equal(fmtTimeControl({ days: 1 }), "1 day per move");
+  assert.equal(fmtTimeControl({ days: 3 }), "3 days per move");
+  assert.equal(fmtTimeControl({ minutes: 90, increment: 30 }), "90 min + 30 s per move");
+  assert.equal(fmtTimeControl({ minutes: 10, increment: 0 }), "10 min");
+  assert.equal(fmtTimeControl(null), "no time limit");
 });
 
 test("extractId and the private token check", () => {

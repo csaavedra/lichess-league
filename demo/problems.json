@@ -33,8 +33,8 @@
       { "white": "player5", "black": "player6", "id": "" }
     ] },
     { "name": "Round 4", "games": [
-      { "white": "player2", "black": "player3", "id": "" },
-      { "white": "player7", "black": "player5", "id": "" },
+      { "white": "player2", "black": "player3", "id": "probR4G1", "demo": { "daysPerTurn": 7 } },
+      { "white": "player7", "black": "player5", "id": "probR4G2", "demo": { "clock": { "minutes": 10, "increment": 5 } } },
       { "white": "player1", "black": "player4", "id": "" },
       { "white": "player6", "black": "player8", "id": "" }
     ] },
@@ -59,6 +59,7 @@
   ],
 
   "rated": true,
+  "timeControl": { "days": 3 },
   "scoring": { "win": 1, "draw": 0.5, "loss": 0 },
   "refreshSeconds": 300
 }

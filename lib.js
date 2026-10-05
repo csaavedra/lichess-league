@@ -64,6 +64,8 @@ export function summarize(g) {
     createdAt: g.createdAt,
     opening: g.opening ? g.opening.name : "",
     daysPerTurn: g.daysPerTurn || null,
+    // Seconds in the export; minutes here, as in tournament.json.
+    clock: g.clock ? { minutes: g.clock.initial / 60, increment: g.clock.increment } : null,
     rated: !!g.rated,
   };
 }
@@ -131,6 +133,46 @@ export function scheduleMismatch(slot, g) {
 
 // A game that isn't rated when the tournament is, or the other way round.
 export const ratedMismatch = (rated, g) => !!g && g.rated !== rated;
+
+// ---------- time control ----------
+// tournament.json has { "days": 3 } for correspondence, or
+// { "minutes": 90, "increment": 30 } for a clock (increment in seconds).
+// Returns { tc, error }: tc is null when there is no setting, or it's invalid.
+export function parseTimeControl(raw) {
+  if (raw == null) return { tc: null, error: "" };
+  const bad = (why) => ({ tc: null, error: `The timeControl in tournament.json ${why}, so the page doesn't check the games' time control.` });
+  if (typeof raw !== "object" || Array.isArray(raw)) return bad('should look like { "days": 3 } or { "minutes": 90, "increment": 30 }');
+  const { days, minutes, increment = 0 } = raw;
+  if (days != null && minutes != null) return bad('has both "days" and "minutes"');
+  if (days != null) return Number.isInteger(days) && days > 0 ? { tc: { days }, error: "" } : bad('needs "days" to be a whole number of days');
+  if (minutes == null) return bad('needs either "days" or "minutes"');
+  const ok = (n) => typeof n === "number" && Number.isFinite(n) && n >= 0;
+  if (!ok(minutes) || !minutes) return bad('needs "minutes" to be a number of minutes');
+  if (!ok(increment)) return bad('needs "increment" to be a number of seconds');
+  return { tc: { minutes, increment }, error: "" };
+}
+
+// A game's time control, in the same shape; null for one with no time limit.
+export function gameTimeControl(g) {
+  if (g.daysPerTurn) return { days: g.daysPerTurn };
+  if (g.clock) return { minutes: g.clock.minutes, increment: g.clock.increment };
+  return null;
+}
+
+export function fmtTimeControl(tc) {
+  if (!tc) return "no time limit";
+  if (tc.days) return `${plural(tc.days, "day")} per move`;
+  return `${tc.minutes} min` + (tc.increment ? ` + ${tc.increment} s per move` : "");
+}
+
+// A game played at another time control than the tournament's. Without a
+// setting there is nothing to check.
+export function timeControlMismatch(tc, g) {
+  if (!tc || !g) return false;
+  const have = gameTimeControl(g);
+  if (!have) return true;
+  return tc.days ? have.days !== tc.days : have.minutes !== tc.minutes || have.increment !== tc.increment;
+}
 
 // ---------- player stats ----------
 const expected = (me, opp) => 1 / (1 + Math.pow(10, (opp - me) / 400));

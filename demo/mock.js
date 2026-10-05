@@ -10,6 +10,8 @@
 //   rated:      whether the game is rated (default: the tournament's setting)
 //   hoursAgo:   for a game in progress, when the last move was made
 //   daysPerTurn: default 3
+//   clock:      { minutes, increment } for a game on a clock instead of
+//               days per move
 //   missing:    true for a game Lichess doesn't know
 //   plies:      how many half-moves to play
 
@@ -78,11 +80,13 @@ try {
     const diff = (color) => (!rated || !finished || status === "aborted" ? undefined : !winner ? 0 : winner === color ? 9 : -9);
     const side = (u, color) => ({ user: { id: u.toLowerCase(), name: u }, rating: seed(u), ratingDiff: diff(color) });
 
-    const daysPerTurn = d.daysPerTurn ?? 3;
+    const clock = d.clock && { initial: d.clock.minutes * 60, increment: d.clock.increment ?? 0 };
+    if (clock) clock.totalTime = clock.initial + 40 * clock.increment;
+    const daysPerTurn = clock ? undefined : d.daysPerTurn ?? 3;
     const createdAt = now - (cfg.rounds.length + 1 - r) * 10 * DAY;
     const lastMoveAt = finished ? createdAt + 8 * DAY : plies ? now - (d.hoursAgo ?? rand() * 30) * HOUR : undefined;
     return {
-      id, rated, status, winner, daysPerTurn, createdAt, lastMoveAt,
+      id, rated, status, winner, daysPerTurn, clock, createdAt, lastMoveAt,
       players: { white: side(white, "white"), black: side(black, "black") },
       moves: c.history().join(" "),
       lastFen: c.fen(),
