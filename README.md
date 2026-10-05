@@ -66,10 +66,17 @@ on every refresh, so editing it is how you update the tournament.
   The page flags a game that isn't set up that way.
 - `timeControl`: the time control the games should have, either
   `{ "days": 3 }` (days per move) or `{ "minutes": 90, "increment": 30 }`
-  (a clock, with the increment in seconds). The page flags a game with a
-  different one. Without it, any time control is accepted.
+  (a clock, with the increment in seconds). It has to be one Lichess's
+  challenge form offers: 1, 2, 3, 5, 7, 10 or 14 days, or one of its
+  clocks. The page flags a game with a different one. Without it, any time
+  control is accepted.
 - `scoring`: points for a win, draw and loss (default 1, ½, 0).
 - `refreshSeconds`: how often to poll Lichess (default 300).
+
+Each game not on Lichess yet has a link for White to send the challenge.
+It opens Lichess's "challenge a friend" form with Black as the opponent,
+White's colour, and the tournament's `rated` and `timeControl` already
+chosen. Lichess won't send the challenge if any of them is changed.
 
 Once a game starts on Lichess, put its 8-character ID (or its link, like
 `https://lichess.org/AbCd1234`) in `id`. The page flags a game whose players
