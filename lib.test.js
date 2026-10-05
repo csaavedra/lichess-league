@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import {
   START_FEN, DAY_MS, fmtPts, plural, deadlineOf, fmtLeft, extractId, isPrivateId, summarize,
   computeStandings, scheduleMismatch, ratedMismatch, playerGames, playerStats,
-  parseTimeControl, gameTimeControl, fmtTimeControl, timeControlMismatch,
+  parseTimeControl, gameTimeControl, fmtTimeControl, timeControlMismatch, challengeUrl,
 } from "./lib.js";
 
 // players: [[username, seed, seedRating]] -> the page's roster map.
@@ -257,8 +257,12 @@ test("parseTimeControl: days or a clock, anything else is an error", () => {
   assert.deepEqual(parseTimeControl({ days: 3 }).tc, { days: 3 });
   assert.deepEqual(parseTimeControl({ minutes: 90, increment: 30 }).tc, { minutes: 90, increment: 30 });
   assert.deepEqual(parseTimeControl({ minutes: 10 }).tc, { minutes: 10, increment: 0 });
+  assert.deepEqual(parseTimeControl({ minutes: 0.5, increment: 0 }).tc, { minutes: 0.5, increment: 0 });
+  assert.deepEqual(parseTimeControl({ minutes: 0, increment: 2 }).tc, { minutes: 0, increment: 2 });
+  // Only what Lichess offers, or the challenge links couldn't be sent.
   for (const bad of [3, "3 days", [], {}, { days: 0 }, { days: 2.5 }, { days: "3" }, { days: 3, minutes: 10 },
-    { minutes: 0 }, { minutes: -5 }, { minutes: 10, increment: -1 }, { minutes: 10, increment: "5" }]) {
+    { days: 4 }, { days: 30 }, { minutes: 0 }, { minutes: -5 }, { minutes: 0.3 }, { minutes: 21 }, { minutes: 200 },
+    { minutes: 10, increment: -1 }, { minutes: 10, increment: "5" }, { minutes: 10, increment: 22 }]) {
     const { tc, error } = parseTimeControl(bad);
     assert.equal(tc, null, JSON.stringify(bad));
     assert.match(error, /timeControl/, JSON.stringify(bad));
@@ -290,6 +294,24 @@ test("time control checks: the game must match the tournament's", () => {
   assert.equal(fmtTimeControl({ minutes: 90, increment: 30 }), "90 min + 30 s per move");
   assert.equal(fmtTimeControl({ minutes: 10, increment: 0 }), "10 min");
   assert.equal(fmtTimeControl(null), "no time limit");
+});
+
+test("challengeUrl: White challenges Black with the tournament's settings", () => {
+  const slot = { white: "alice", black: "bob" };
+  const parse = (url) => {
+    const u = new URL(url);
+    assert.equal(u.origin + u.pathname, "https://lichess.org/");
+    assert.equal(u.hash, "#friend");
+    return Object.fromEntries(u.searchParams);
+  };
+  // "color" is the side of whoever opens the link, White; "user" is the opponent.
+  assert.deepEqual(parse(challengeUrl(slot, { rated: true, timeControl: { days: 3 } })),
+    { user: "bob", color: "white", variant: "standard", gameMode: "rated", time: "correspondence", days: "3" });
+  assert.deepEqual(parse(challengeUrl(slot, { rated: false, timeControl: { minutes: 90, increment: 30 } })),
+    { user: "bob", color: "white", variant: "standard", gameMode: "casual", time: "realTime", minutesPerSide: "90", increment: "30" });
+  assert.equal(parse(challengeUrl(slot, { rated: true, timeControl: { minutes: 0.5, increment: 0 } })).minutesPerSide, "0.5");
+  // Without a time control the player picks one on Lichess.
+  assert.deepEqual(parse(challengeUrl(slot, { rated: true, timeControl: null })), { user: "bob", color: "white", variant: "standard", gameMode: "rated" });
 });
 
 test("extractId and the private token check", () => {

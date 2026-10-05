@@ -169,6 +169,7 @@ table.cross { border-collapse: collapse; width: 100%; font-variant-numeric: tabu
 .status { font-size: 13.5px; color: var(--muted); line-height: 1.4; }
 .status b { color: var(--ink); font-weight: 600; }
 .status.warn { color: var(--warn); font-weight: 600; }
+.status a { color: var(--accent); font-weight: 600; }
 .left { white-space: nowrap; }
 .left.urgent { color: var(--warn); font-weight: 600; }
 .game.pending { cursor: default; }
@@ -326,7 +327,7 @@ footer a { color: inherit; text-underline-offset: 2px; }
 import {
   START_FEN, ONGOING, DAY_MS, DEFAULT_SCORING, fmtPts, plural, deadlineOf, fmtLeft, extractId, isPrivateId, summarize,
   computeStandings, scheduleMismatch, ratedMismatch, playerGames, playerStats,
-  parseTimeControl, gameTimeControl, fmtTimeControl, timeControlMismatch,
+  parseTimeControl, gameTimeControl, fmtTimeControl, timeControlMismatch, challengeUrl,
 } from "./lib.js";
 
 // chess.js is only used to replay the moves of a game. No engine is loaded anywhere on this page.
@@ -709,6 +710,13 @@ function statusText(g) {
   return `<b>${esc(who)} to move</b>${left ? `, ${left}` : ""}<br>Move ${g.turn === "white" ? moveNo + 1 : moveNo}, last move ${ago(g.lastMoveAt)}`;
 }
 
+// Empty when the schedule is missing a player.
+function challengeLink(slot, text) {
+  if (!slot.white || !slot.black) return "";
+  const url = challengeUrl(slot, { rated, timeControl });
+  return `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(text)}</a>`;
+}
+
 function renderGames() {
   const r = rounds[state.round];
   const el = document.getElementById("games");
@@ -725,8 +733,10 @@ function renderGames() {
   el.innerHTML = r.slots.map((slot) => {
     const g = slot.id && state.games.get(slot.id);
     if (!g) {
+      const link = !slot.raw && challengeLink(slot, `${nameOf(slot.white)}, challenge ${nameOf(slot.black)} on Lichess`);
       let status = "<b>Not started yet.</b>";
       if (slot.id) status = `Game <b>${esc(slot.id)}</b> ${notFound.has(slot.id) ? "was not found on Lichess. Check the ID." : "is loading…"}`;
+      else if (link) status += ` White sends the challenge: ${link}.${timeControl ? "" : " Pick the time control there."}`;
       return `<div class="game pending">
         ${plainSideHTML(slot.black, "black")}
         ${boardHTML(START_FEN, null)}
@@ -907,7 +917,8 @@ function renderPlayer() {
     .map((x) => {
       const color = x.white === pid ? "white" : "black";
       const opp = x.white === pid ? x.black : x.white;
-      return `<li><span class="chip ${color[0]}" title="With ${color}"></span>${esc(r.name)} · <b>${esc(nameOf(opp))}</b></li>`;
+      const link = color === "white" && !x.raw ? challengeLink(x, "send the challenge") : "";
+      return `<li><span class="chip ${color[0]}" title="With ${color}"></span>${esc(r.name)} · <b>${esc(nameOf(opp))}</b>${link ? ` · ${link}` : ""}</li>`;
     }));
   const cfgP = roster.get(pid) || {};
   const seed = cfgP.seed ?? null;

@@ -135,6 +135,13 @@ export function scheduleMismatch(slot, g) {
 export const ratedMismatch = (rated, g) => !!g && g.rated !== rated;
 
 // ---------- time control ----------
+// The values Lichess's challenge form offers. A challenge link with any
+// other value can't be sent, so the setting has to be one of these.
+const LICHESS_DAYS = [1, 2, 3, 5, 7, 10, 14];
+const LICHESS_MINUTES = [0, 1 / 4, 1 / 2, 3 / 4, 1, 3 / 2, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+  25, 30, 35, 40, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180];
+const LICHESS_INCREMENTS = [...Array(21).keys(), 25, 30, 35, 40, 45, 60, 90, 120, 150, 180];
+
 // tournament.json has { "days": 3 } for correspondence, or
 // { "minutes": 90, "increment": 30 } for a clock (increment in seconds).
 // Returns { tc, error }: tc is null when there is no setting, or it's invalid.
@@ -144,11 +151,14 @@ export function parseTimeControl(raw) {
   if (typeof raw !== "object" || Array.isArray(raw)) return bad('should look like { "days": 3 } or { "minutes": 90, "increment": 30 }');
   const { days, minutes, increment = 0 } = raw;
   if (days != null && minutes != null) return bad('has both "days" and "minutes"');
-  if (days != null) return Number.isInteger(days) && days > 0 ? { tc: { days }, error: "" } : bad('needs "days" to be a whole number of days');
+  if (days != null) {
+    return LICHESS_DAYS.includes(days) ? { tc: { days }, error: "" }
+      : bad(`has "days": ${JSON.stringify(days)}, and Lichess only offers ${LICHESS_DAYS.slice(0, -1).join(", ")} or ${LICHESS_DAYS.at(-1)} days per move`);
+  }
   if (minutes == null) return bad('needs either "days" or "minutes"');
-  const ok = (n) => typeof n === "number" && Number.isFinite(n) && n >= 0;
-  if (!ok(minutes) || !minutes) return bad('needs "minutes" to be a number of minutes');
-  if (!ok(increment)) return bad('needs "increment" to be a number of seconds');
+  if (!LICHESS_MINUTES.includes(minutes)) return bad(`has "minutes": ${JSON.stringify(minutes)}, which isn't a clock Lichess offers`);
+  if (!LICHESS_INCREMENTS.includes(increment)) return bad(`has "increment": ${JSON.stringify(increment)}, which isn't an increment Lichess offers`);
+  if (!minutes && !increment) return bad("has a clock of no time at all");
   return { tc: { minutes, increment }, error: "" };
 }
 
@@ -172,6 +182,23 @@ export function timeControlMismatch(tc, g) {
   const have = gameTimeControl(g);
   if (!have) return true;
   return tc.days ? have.days !== tc.days : have.minutes !== tc.minutes || have.increment !== tc.increment;
+}
+
+// ---------- challenges ----------
+// Lichess's "challenge a friend" form, filled in and locked to the
+// tournament's settings. "color" is the side of whoever opens the link,
+// White; "user" is the opponent.
+export function challengeUrl(slot, { rated, timeControl }) {
+  const q = new URLSearchParams({ user: slot.black, color: "white", variant: "standard", gameMode: rated ? "rated" : "casual" });
+  if (timeControl?.days) {
+    q.set("time", "correspondence");
+    q.set("days", timeControl.days);
+  } else if (timeControl) {
+    q.set("time", "realTime");
+    q.set("minutesPerSide", timeControl.minutes);
+    q.set("increment", timeControl.increment);
+  }
+  return `https://lichess.org/?${q}#friend`;
 }
 
 // ---------- player stats ----------
