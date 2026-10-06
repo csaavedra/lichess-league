@@ -79,7 +79,10 @@ h1 {
 }
 .brand { display: none; }
 .subtitle { margin: 6px 0 0; color: var(--muted); font-size: 17px; }
-.sync { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 14px; }
+/* The button stays put while the text next to it changes, also when the
+   header wraps. The width fits "Updated 12 minutes ago". */
+.sync { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 14px; margin-left: auto; }
+#sync-text { min-width: 21ch; text-align: right; }
 .sync .dot {
   width: 8px; height: 8px; border-radius: 50%; background: var(--live); display: inline-block;
   margin-right: 6px; vertical-align: 1px;
