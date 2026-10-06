@@ -176,6 +176,16 @@ table.cross { border-collapse: collapse; width: 100%; font-variant-numeric: tabu
 .game.pending:hover { border-color: var(--line); }
 .game.pending .board { opacity: 0.45; filter: saturate(0.6); }
 
+/* Lichess's move font draws K, Q, R, B and N as pieces, so the moves stay
+   plain SAN for copying and screen readers. Only those letters come from it;
+   the rest of each move keeps the page's font. */
+@font-face {
+  font-family: "Lichess Figurines";
+  src: url("https://lichess1.org/assets/font/lichess-chess.woff2") format("woff2");
+  unicode-range: U+42, U+4B, U+4E, U+51, U+52;
+  font-display: swap;
+}
+
 /* Board */
 .board {
   display: grid; grid-template-columns: repeat(8, 1fr); aspect-ratio: 1;
@@ -215,7 +225,7 @@ dialog::backdrop { background: rgba(10, 14, 12, 0.6); }
 }
 .moves .none { grid-column: 2 / -1; padding: 5px 10px; color: var(--muted); }
 .moves .no { color: var(--muted); padding: 5px 8px; background: var(--bg); font-size: 14px; }
-.move { padding: 5px 10px; cursor: pointer; border: 0; background: none; text-align: left; font: 500 15px/1.4 var(--font-text); color: var(--ink); border-radius: 0; }
+.move { padding: 5px 10px; cursor: pointer; border: 0; background: none; text-align: left; font: 500 15px/1.4 "Lichess Figurines", var(--font-text); color: var(--ink); border-radius: 0; }
 .move:hover { background: var(--self); color: var(--ink); }
 .move.cur { background: var(--accent-soft); font-weight: 700; }
 .dlg .side-panel { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
