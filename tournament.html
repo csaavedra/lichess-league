@@ -330,6 +330,7 @@ import {
   START_FEN, ONGOING, DAY_MS, DEFAULT_SCORING, fmtPts, plural, deadlineOf, fmtLeft, extractId, isPrivateId, summarize,
   computeStandings, scheduleMismatch, ratedMismatch, playerGames, playerStats,
   parseTimeControl, gameTimeControl, fmtTimeControl, timeControlMismatch, challengeUrl,
+  parseFormat, tournamentSpan, fmtSpan, subtitleText,
 } from "./lib.js";
 
 // chess.js is only used to replay the moves of a game. No engine is loaded anywhere on this page.
@@ -384,7 +385,7 @@ function tickDeadlines() {
 
 // ---------- config parsing ----------
 let config = null, configText = null;
-let rounds = [], allIds = [], roster = new Map(), scoring = DEFAULT_SCORING, rated = true, timeControl = null;
+let rounds = [], allIds = [], roster = new Map(), scoring = DEFAULT_SCORING, rated = true, timeControl = null, format = "round-robin";
 const notices = { config: "", ids: "", schedule: "", fetch: "" };
 const liveGames = new Map(); // id -> latest export of a game not finished yet
 const notFound = new Set();
@@ -428,10 +429,11 @@ function applyConfig(cfg) {
   rated = cfg.rated !== false;
   const tcSetting = parseTimeControl(cfg.timeControl);
   timeControl = tcSetting.tc;
+  const formatSetting = parseFormat(cfg.format);
+  format = formatSetting.format;
 
   const title = cfg.title || "Correspondence round-robin";
   document.getElementById("title").textContent = title;
-  document.getElementById("subtitle").textContent = cfg.subtitle || "";
   document.title = title;
 
   if (state.round === null || state.round >= rounds.length) state.round = currentRound();
@@ -446,6 +448,7 @@ function applyConfig(cfg) {
   if (privateIds.length) warnings.push(`These game IDs in tournament.json include a player's private token: ${privateIds.join(", ")}. Keep only their first 8 characters. The extra 4 let anyone move for that player, and should never be shared.`);
   if (badIds.length) warnings.push(`These entries in tournament.json are not valid Lichess game IDs and were skipped: ${badIds.join(", ")}.`);
   if (tcSetting.error) warnings.push(tcSetting.error);
+  if (formatSetting.error) warnings.push(formatSetting.error);
   notices.ids = warnings.join(" ");
 }
 
@@ -776,9 +779,23 @@ function renderNotice() {
   el.textContent = msg;
 }
 
+// A subtitle in tournament.json replaces the one built from the settings.
+// The dates wait until every game has loaded.
+function renderSubtitle() {
+  if (!config) return;
+  let text = config.subtitle;
+  if (typeof text !== "string") {
+    const loading = allIds.some((id) => !state.games.has(id) && !notFound.has(id));
+    const span = loading ? null : fmtSpan(tournamentSpan(rounds.flatMap((r) => r.slots), state.games));
+    text = subtitleText({ rated, format, timeControl, span });
+  }
+  document.getElementById("subtitle").textContent = text;
+}
+
 function renderAll() {
   notices.schedule = scheduleNotice();
   renderNotice();
+  renderSubtitle();
   renderStandings();
   renderTabs();
   renderGames();

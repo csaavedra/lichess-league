@@ -5,6 +5,7 @@ import {
   START_FEN, DAY_MS, fmtPts, plural, deadlineOf, fmtLeft, extractId, isPrivateId, summarize,
   computeStandings, scheduleMismatch, ratedMismatch, playerGames, playerStats,
   parseTimeControl, gameTimeControl, fmtTimeControl, timeControlMismatch, challengeUrl,
+  parseFormat, endOf, tournamentSpan, fmtSpan, subtitleText,
 } from "./lib.js";
 
 // players: [[username, seed, seedRating]] -> the page's roster map.
@@ -16,14 +17,14 @@ function playersMap(list) {
 // result: "1-0", "0-1", "½-½", "live" or "aborted".
 let nextId = 0;
 function game(white, black, result, extra = {}) {
-  const status = { "1-0": "mate", "0-1": "resign", "½-½": "draw", live: "started", aborted: "aborted" }[result];
+  const status = extra.status ?? { "1-0": "mate", "0-1": "resign", "½-½": "draw", live: "started", aborted: "aborted" }[result];
   const winner = { "1-0": "white", "0-1": "black" }[result];
   const side = (u, rating, ratingDiff) => ({ user: { id: u, name: u }, rating, ratingDiff });
   return summarize({
     id: `game${String(nextId++).padStart(4, "0")}`, status, winner, rated: extra.rated ?? true,
     players: { white: side(white, extra.whiteRating ?? 1500, extra.whiteDiff), black: side(black, extra.blackRating ?? 1500, extra.blackDiff) },
     moves: extra.moves ?? "e4 e5 Nf3",
-    lastMoveAt: extra.lastMoveAt ?? 1000, createdAt: 0,
+    lastMoveAt: extra.lastMoveAt ?? 1000, createdAt: extra.createdAt ?? 0,
     daysPerTurn: "daysPerTurn" in extra ? extra.daysPerTurn : 3, clock: extra.clock,
   });
 }
@@ -364,4 +365,56 @@ test("deadline: last move plus days per move, only while a game is being played"
   assert.equal(deadlineOf(game("a", "b", "½-½")), null);
   assert.equal(deadlineOf(game("a", "b", "aborted")), null);
   assert.equal(deadlineOf(game("a", "b", "live", { moves: "" })), null);
+});
+
+test("parseFormat: only round-robin, which is the default", () => {
+  assert.deepEqual(parseFormat(undefined), { format: "round-robin", error: "" });
+  assert.deepEqual(parseFormat("round-robin"), { format: "round-robin", error: "" });
+  for (const raw of ["swiss", "Round-robin", 3]) {
+    const { format, error } = parseFormat(raw);
+    assert.equal(format, null);
+    assert.match(error, /only supports "round-robin"/);
+  }
+});
+
+test("endOf: the last move, or the deadline for a correspondence game lost on time", () => {
+  assert.equal(endOf(game("a", "b", "1-0", { lastMoveAt: 5000 })), 5000);
+  assert.equal(endOf(game("a", "b", "0-1", { lastMoveAt: 5000 })), 5000);
+  assert.equal(endOf(game("a", "b", "1-0", { lastMoveAt: 5000, status: "outoftime" })), 5000 + 3 * DAY_MS);
+  assert.equal(endOf(game("a", "b", "1-0", { lastMoveAt: 5000, status: "outoftime", daysPerTurn: null, clock: { initial: 300, increment: 0 } })), 5000);
+});
+
+test("tournamentSpan: from the first game created to the last game ended", () => {
+  const g1 = game("a", "b", "1-0", { createdAt: 200, lastMoveAt: 900 });
+  const g2 = game("c", "d", "live", { createdAt: 100, lastMoveAt: 300 });
+  const g3 = game("c", "d", "½-½", { createdAt: 100, lastMoveAt: 700 });
+  const void1 = game("c", "d", "aborted", { createdAt: 50 });
+  const games = new Map([g1, g2, g3, void1].map((g) => [g.id, g]));
+  const span = (...ids) => tournamentSpan(ids.map((id) => ({ id })), games);
+  assert.deepEqual(span(), { start: null, end: null });
+  assert.deepEqual(span(null, ""), { start: null, end: null });
+  assert.deepEqual(span(void1.id), { start: null, end: null });
+  assert.deepEqual(span("notLoaded"), { start: null, end: null });
+  assert.deepEqual(span(g1.id, g2.id), { start: 100, end: null });
+  assert.deepEqual(span(g1.id, null), { start: 200, end: null });
+  assert.deepEqual(span(g1.id, void1.id), { start: 200, end: null });
+  assert.deepEqual(span(g1.id, g3.id), { start: 100, end: 900 });
+});
+
+test("fmtSpan: upcoming, since a date, or a range as short as it reads", () => {
+  const at = (y, m, d, h = 12) => new Date(y, m - 1, d, h).getTime();
+  assert.equal(fmtSpan({ start: null, end: null }), "upcoming");
+  assert.equal(fmtSpan({ start: at(2026, 10, 1), end: null }), "since October 1st, 2026");
+  assert.equal(fmtSpan({ start: at(2026, 10, 1), end: at(2026, 10, 1, 23) }), "October 1st, 2026");
+  assert.equal(fmtSpan({ start: at(2026, 10, 1), end: at(2026, 10, 20) }), "October 1st – 20th, 2026");
+  assert.equal(fmtSpan({ start: at(2026, 10, 2), end: at(2026, 12, 23) }), "October 2nd – December 23rd, 2026");
+  assert.equal(fmtSpan({ start: at(2026, 10, 11), end: at(2027, 1, 31) }), "October 11th, 2026 – January 31st, 2027");
+  assert.equal(fmtSpan({ start: at(2026, 3, 12), end: at(2027, 3, 22) }), "March 12th, 2026 – March 22nd, 2027");
+});
+
+test("subtitleText", () => {
+  const base = { rated: true, format: "round-robin", timeControl: { days: 3 }, span: "since October 1st, 2026" };
+  assert.equal(subtitleText(base), "Rated · round-robin · 3 days per move · since October 1st, 2026");
+  assert.equal(subtitleText({ ...base, rated: false, timeControl: { minutes: 15, increment: 10 } }), "Unrated · round-robin · 15 min + 10 s per move · since October 1st, 2026");
+  assert.equal(subtitleText({ ...base, format: null, timeControl: null, span: null }), "Rated");
 });

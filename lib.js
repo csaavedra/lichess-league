@@ -201,6 +201,55 @@ export function challengeUrl(slot, { rated, timeControl }) {
   return `https://lichess.org/?${q}#friend`;
 }
 
+// ---------- subtitle ----------
+// "Rated · round-robin · 3 days per move · since October 1st, 2026"
+
+// Returns { format, error }: format is null when the setting is invalid.
+export function parseFormat(raw) {
+  if (raw == null || raw === "round-robin") return { format: "round-robin", error: "" };
+  return { format: null, error: `The format in tournament.json is ${JSON.stringify(raw)}, but the page only supports "round-robin", so it ignores it.` };
+}
+
+// Lichess keeps no end time. A game on time ends at its deadline; anything
+// else ends at its last move, which for a resignation or a draw offer
+// is earlier than the real end.
+export function endOf(g) {
+  if (g.status === "outoftime" && g.daysPerTurn) return g.lastMoveAt + g.daysPerTurn * DAY_MS;
+  return g.lastMoveAt;
+}
+
+// When the tournament ran: start is null until a game exists, end until
+// every scheduled game has a result. slots: [{ id }], games: Map id -> summary.
+export function tournamentSpan(slots, games) {
+  const played = slots.map((x) => x.id && games.get(x.id)).filter((g) => g && g.result !== "void");
+  if (!played.length) return { start: null, end: null };
+  const start = Math.min(...played.map((g) => g.createdAt));
+  const done = played.length === slots.length && played.every((g) => g.result);
+  return { start, end: done ? Math.max(...played.map(endOf)) : null };
+}
+
+// In the viewer's time zone, but always in English, like the rest of the page.
+const ORDINAL = { one: "st", two: "nd", few: "rd", other: "th" };
+const ordinals = new Intl.PluralRules("en", { type: "ordinal" });
+const day = (d) => `${d.getDate()}${ORDINAL[ordinals.select(d.getDate())]}`;
+const month = (d) => d.toLocaleString("en", { month: "long" });
+
+export function fmtSpan({ start, end }) {
+  if (start == null) return "upcoming";
+  const a = new Date(start), full = (d) => `${month(d)} ${day(d)}, ${d.getFullYear()}`;
+  if (end == null) return `since ${full(a)}`;
+  const b = new Date(end);
+  if (a.getFullYear() !== b.getFullYear()) return `${full(a)} – ${full(b)}`;
+  if (a.getMonth() !== b.getMonth()) return `${month(a)} ${day(a)} – ${full(b)}`;
+  if (a.getDate() !== b.getDate()) return `${month(a)} ${day(a)} – ${day(b)}, ${b.getFullYear()}`;
+  return full(a);
+}
+
+// span: fmtSpan()'s text, or null to leave the dates out.
+export function subtitleText({ rated, format, timeControl, span }) {
+  return [rated ? "Rated" : "Unrated", format, timeControl && fmtTimeControl(timeControl), span].filter(Boolean).join(" · ");
+}
+
 // ---------- player stats ----------
 const expected = (me, opp) => 1 / (1 + Math.pow(10, (opp - me) / 400));
 

@@ -66,7 +66,12 @@ is all it takes to keep the tournament up to date.
 
 `tournament.json` holds everything about the tournament:
 
-- `title`, `subtitle`: shown in the header.
+- `title`: shown in the header.
+- `subtitle`: shown under the title. Without it, the page builds one from
+  the settings and the games, like "Rated · round-robin · 3 days per move ·
+  since October 1st, 2026". The dates run from the first game created to
+  the last game ended, or say "upcoming" before any game exists. Use `""`
+  for no subtitle.
 - `players`: each player's Lichess `username`, display `name`, `seed`, and a
   `seedRating` (with `seedBasis`, the rating it came from). Seed ratings are
   used for expected score and performance.
@@ -81,6 +86,8 @@ is all it takes to keep the tournament up to date.
   challenge form offers: 1, 2, 3, 5, 7, 10 or 14 days, or one of its
   clocks. Without it, any time control is accepted, and players pick one
   when they send the challenge.
+- `format`: how the tournament is played. Only `"round-robin"`, the
+  default, is supported for now.
 - `scoring`: points for a win, draw and loss (default 1, ½, 0).
 - `refreshSeconds`: how often to check Lichess for updates (default 300).
 
