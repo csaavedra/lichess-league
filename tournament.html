@@ -327,7 +327,8 @@ footer a { color: inherit; text-underline-offset: 2px; }
 
 <script type="module">
 import {
-  START_FEN, ONGOING, DAY_MS, fmtPts, plural, deadlineOf, fmtLeft, summarize, parseConfig,
+  START_FEN, ONGOING, DAY_MS, fmtPts, plural, ordinal, deadlineOf, fmtLeft, summarize, parseConfig, scoreOf, KINDS,
+  roundStats, roundState, currentRound,
   computeStandings, scheduleMismatch, ratedMismatch, playerGames, playerStats,
   gameTimeControl, fmtTimeControl, timeControlMismatch, challengeUrl,
   tournamentSpan, fmtSpan, gameDates, subtitleText,
@@ -343,6 +344,8 @@ const REASONS = {
   mate: "checkmate", resign: "resignation", outoftime: "on time", timeout: "opponent left",
   stalemate: "stalemate", draw: "draw", cheat: "fair-play forfeit", variantEnd: "game over",
 };
+const reason = (g) => REASONS[g.status] || "finished";
+const moveCount = (g) => Math.ceil(g.moves.length / 2);
 
 const state = {
   games: new Map(),     // id -> summary
@@ -408,7 +411,7 @@ function applyConfig(cfg) {
   config = cfg;
   document.getElementById("title").textContent = cfg.title;
   document.title = cfg.title;
-  if (state.round === null || state.round >= cfg.rounds.length) state.round = currentRound();
+  if (state.round === null || state.round >= cfg.rounds.length) state.round = currentRound(cfg.rounds, state.games);
   notices.ids = cfg.warnings.join(" ");
 }
 
@@ -526,7 +529,6 @@ function cacheFinished(g) {
 }
 
 const seedOf = (id) => config.roster.get(id)?.seed ?? null;
-const ordinal = (n) => n + ((n % 100 >= 11 && n % 100 <= 13) ? "th" : ["th", "st", "nd", "rd"][n % 10] || "th");
 // A player from a game (Lichess has the right capitalisation), or a username from the schedule.
 const displayName = (p) => config.roster.get(p.id)?.name || p.username;
 const nameOf = (id) => config.roster.get(id)?.name || config.roster.get(id)?.username || id;
@@ -586,29 +588,6 @@ function renderStandings() {
   t.innerHTML = html + "</tbody>";
 }
 
-function roundStats(r) {
-  let done = 0, live = 0;
-  r.ids.forEach((id) => {
-    const g = state.games.get(id);
-    if (!g) return;
-    if (g.result) done++; else live++;
-  });
-  return { done, live, total: r.slots.length, waiting: r.slots.filter((x) => !x.id).length };
-}
-
-// Finished once every game has a result, live once any game exists on Lichess, upcoming before that.
-function roundState(st) {
-  if (st.total && st.done === st.total) return "done";
-  return st.done || st.live ? "live" : "upcoming";
-}
-
-// The first round with a game in progress, else the last round with any games.
-function currentRound() {
-  const live = config.rounds.findIndex((r) => roundStats(r).live);
-  if (live >= 0) return live;
-  return Math.max(0, config.rounds.findLastIndex((r) => r.ids.length));
-}
-
 // A game whose players or colours differ from its slot in the schedule,
 // or that isn't rated or timed the way the tournament is.
 function mismatchText(slot, g) {
@@ -636,7 +615,7 @@ const ROUND_LABELS = { upcoming: "not started", live: "in progress", done: "fini
 function renderTabs() {
   const el = document.getElementById("tabs");
   el.innerHTML = config.rounds.map((r, i) => {
-    const st = roundStats(r);
+    const st = roundStats(r, state.games);
     const kind = roundState(st);
     const label = ROUND_LABELS[kind];
     const lead = kind === "live" ? '<span class="pulse" aria-hidden="true"></span>' : "";
@@ -654,11 +633,8 @@ function ratingHTML(p) {
 
 function sideHTML(p, color, g) {
   const toMove = !g.result && g.turn === color;
-  let score = "";
-  if (g.result && g.result !== "void") {
-    score = g.result === "½-½" ? "½" : (color === "white") === (g.result === "1-0") ? "1" : "0";
-  }
-  return `<div class="side${toMove ? " to-move" : ""}${score === "0" ? " lost" : ""}"><span class="chip ${color[0]}"></span><span class="nm">${esc(displayName(p))}${ratingHTML(p)}</span><span class="sc">${score}</span></div>`;
+  const score = scoreOf(g, color);
+  return `<div class="side${toMove ? " to-move" : ""}${score === 0 ? " lost" : ""}"><span class="chip ${color[0]}"></span><span class="nm">${esc(displayName(p))}${ratingHTML(p)}</span><span class="sc">${score === null ? "" : fmtPts(score)}</span></div>`;
 }
 
 function plainSideHTML(id, color) {
@@ -667,11 +643,8 @@ function plainSideHTML(id, color) {
 
 function statusText(g) {
   if (g.result === "void") return "Aborted. This game does not count.";
-  const moveNo = Math.ceil(g.moves.length / 2);
-  if (g.result) {
-    const why = REASONS[g.status] || "finished";
-    return `<b>${g.result}</b> by ${why}, ${plural(moveNo, "move")}`;
-  }
+  const moveNo = moveCount(g);
+  if (g.result) return `<b>${g.result}</b> by ${reason(g)}, ${plural(moveNo, "move")}`;
   if (!g.moves.length) return "<b>Not started.</b> White to make the first move.";
   const who = displayName(g.turn === "white" ? g.white : g.black);
   const left = leftHTML(g);
@@ -695,7 +668,7 @@ function renderGames() {
     el.innerHTML = `<div class="empty">No games added for ${esc(r.name)} yet. Add them to this round in tournament.json, for example <code>{ "white": "user1", "black": "user2", "id": "AbCd1234" }</code>.</div>`;
     return;
   }
-  const st = roundStats(r);
+  const st = roundStats(r, state.games);
   meta.textContent = `${st.done} of ${st.total} games finished` + (st.live ? `, ${st.live} in progress` : "") +
     (st.waiting ? `, ${st.waiting} not started yet` : "");
   el.innerHTML = r.slots.map((slot) => {
@@ -943,8 +916,8 @@ function renderPlayer() {
       const left = leftHTML(g);
       note = !g.moves.length ? "Not started" : `${esc(displayName(g.turn === color ? me : opp))} to move, ${left ? `${left}, ` : ""}last move ${ago(g.lastMoveAt)}`;
     } else {
-      res = score === 1 ? '<span class="w">1</span>' : score === 0 ? '<span class="l">0</span>' : '<span class="d">½</span>';
-      note = `${REASONS[g.status] || "finished"}${g.opening ? ", " + esc(g.opening) : ""}`;
+      res = `<span class="${KINDS[score]}">${fmtPts(score)}</span>`;
+      note = `${reason(g)}${g.opening ? ", " + esc(g.opening) : ""}`;
       note = note[0].toUpperCase() + note.slice(1);
     }
     const diff = me.ratingDiff != null ? `<span class="${trend(me.ratingDiff)}">${signed(me.ratingDiff)}</span>` : "";
@@ -953,7 +926,7 @@ function renderPlayer() {
       <td class="opp"><span class="chip ${color[0]}" title="Played with ${color}"></span>${esc(displayName(opp))}${ratingHTML(opp)}</td>
       <td class="r">${res}</td>
       <td class="num">${diff}</td>
-      <td class="num">${Math.ceil(g.moves.length / 2)}</td>
+      <td class="num">${moveCount(g)}</td>
       <td class="note">${note}</td>
     </tr>`;
   }).join("");
@@ -1083,7 +1056,7 @@ async function refresh(manual) {
       if (finishedCache[id]) liveGames.delete(id); else liveGames.set(id, raw);
     }
     showGames();
-    if (!roundSettled) { state.round = currentRound(); roundSettled = true; }
+    if (!roundSettled) { state.round = currentRound(config.rounds, state.games); roundSettled = true; }
     state.lastUpdate = Date.now();
     notices.fetch = "";
     renderNotice();

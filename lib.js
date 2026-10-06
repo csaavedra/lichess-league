@@ -42,6 +42,15 @@ export function extractId(raw) {
 export const isPrivateId = (raw) => /^[A-Za-z0-9]{12}$/.test(stripLink(raw));
 
 // ---------- games ----------
+// A player's score in a game: 1, ½ or 0, or null while it's being played or when it doesn't count.
+export function scoreOf(g, color) {
+  if (!g.result || g.result === "void") return null;
+  if (g.result === "½-½") return 0.5;
+  return (g.result === "1-0") === (color === "white") ? 1 : 0;
+}
+// A score as won, drawn or lost: "w", "d" or "l".
+export const KINDS = { 1: "w", 0.5: "d", 0: "l" };
+const pointsOf = (kind, sc) => ({ w: sc.win, d: sc.draw, l: sc.loss }[kind]);
 function playerOf(p) {
   if (p?.user) return { id: p.user.id || p.user.name.toLowerCase(), username: p.user.name, rating: p.rating ?? null, ratingDiff: p.ratingDiff ?? null, provisional: !!p.provisional };
   return { id: "?anon", username: "Anonymous", rating: null, ratingDiff: null, provisional: false };
@@ -91,9 +100,9 @@ export function computeStandings(rounds, games, players, sc = DEFAULT_SCORING) {
     const b = ensure(g.black.id, g.black.username, true);
     if (g.result === "void") return;
     if (!g.result) { cell(w, b).push({ live: true }); cell(b, w).push({ live: true }); return; }
-    const [wk, bk] = { "1-0": "wl", "0-1": "lw", "½-½": "dd" }[g.result];
-    for (const [me, opp, kind] of [[w, b, wk], [b, w, bk]]) {
-      const s = { w: sc.win, d: sc.draw, l: sc.loss }[kind];
+    for (const [me, opp, color] of [[w, b, "white"], [b, w, "black"]]) {
+      const kind = KINDS[scoreOf(g, color)];
+      const s = pointsOf(kind, sc);
       me.pts += s; me.played++;
       if (kind === "w") me.wins++;
       cell(me, opp).push({ s, kind });
@@ -121,6 +130,31 @@ export function computeStandings(rounds, games, players, sc = DEFAULT_SCORING) {
     b.pts - a.pts || b.tiedWins - a.tiedWins || b.sb - a.sb || b.wins - a.wins ||
     (seedOf(a.id) ?? Infinity) - (seedOf(b.id) ?? Infinity) || nameOf(a).localeCompare(nameOf(b))
   );
+}
+
+// ---------- rounds ----------
+// r: a round from parseConfig(), games: Map id -> summary. An aborted game counts as done.
+export function roundStats(r, games) {
+  let done = 0, live = 0;
+  r.ids.forEach((id) => {
+    const g = games.get(id);
+    if (!g) return;
+    if (g.result) done++; else live++;
+  });
+  return { done, live, total: r.slots.length, waiting: r.slots.filter((x) => !x.id).length };
+}
+
+// Finished once every game has a result, live once any game exists on Lichess, upcoming before that.
+export function roundState(st) {
+  if (st.total && st.done === st.total) return "done";
+  return st.done || st.live ? "live" : "upcoming";
+}
+
+// The index of the first round with a game in progress, else of the last round with any games.
+export function currentRound(rounds, games) {
+  const live = rounds.findIndex((r) => roundStats(r, games).live);
+  if (live >= 0) return live;
+  return Math.max(0, rounds.findLastIndex((r) => r.ids.length));
 }
 
 // A game whose players or colours differ from its slot in the schedule:
@@ -242,7 +276,8 @@ export function tournamentSpan(slots, games) {
 // In the viewer's time zone, but always in English, like the rest of the page.
 const ORDINAL = { one: "st", two: "nd", few: "rd", other: "th" };
 const ordinals = new Intl.PluralRules("en", { type: "ordinal" });
-const day = (d) => `${d.getDate()}${ORDINAL[ordinals.select(d.getDate())]}`;
+export const ordinal = (n) => `${n}${ORDINAL[ordinals.select(n)]}`;
+const day = (d) => ordinal(d.getDate());
 const month = (d) => d.toLocaleString("en", { month: "long" });
 const full = (d) => `${month(d)} ${day(d)}, ${d.getFullYear()}`;
 
@@ -279,9 +314,7 @@ export function playerGames(pid, rounds, games) {
     if (!g) return;
     const color = g.white.id === pid ? "white" : g.black.id === pid ? "black" : null;
     if (!color) return;
-    let score = null;
-    if (g.result && g.result !== "void") score = g.result === "½-½" ? 0.5 : (g.result === "1-0") === (color === "white") ? 1 : 0;
-    list.push({ g, round: r.name, color, me: g[color], opp: g[color === "white" ? "black" : "white"], score });
+    list.push({ g, round: r.name, color, me: g[color], opp: g[color === "white" ? "black" : "white"], score: scoreOf(g, color) });
   }));
   return list;
 }
@@ -295,10 +328,11 @@ export function playerStats(list, players, sc = DEFAULT_SCORING) {
     if (score === null) { st.live++; return; }
     st.n++;
     st.frac += score;
-    const pts = score === 1 ? sc.win : score === 0 ? sc.loss : sc.draw;
+    const kind = KINDS[score];
+    const pts = pointsOf(kind, sc);
     st.pts += pts;
     st[color].n++; st[color].pts += pts;
-    if (score === 1) st.w++; else if (score === 0) st.l++; else st.d++;
+    st[kind]++;
     // Seed ratings are each player's fixed tournament rating; Lichess ratings
     // change from game to game and can be provisional. Fall back to the
     // Lichess rating at the start of the game for a player without one.
