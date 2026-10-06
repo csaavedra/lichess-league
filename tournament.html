@@ -938,7 +938,7 @@ function renderPlayer() {
     .map((x) => {
       const color = x.white === pid ? "white" : "black";
       const opp = x.white === pid ? x.black : x.white;
-      const link = color === "white" && !x.raw ? challengeLink(x, "send the challenge") : "";
+      const link = color === "white" && !x.raw ? challengeLink(x, "challenge") : "";
       return `<li><span class="chip ${color[0]}" title="With ${color}"></span>${esc(r.name)} · <b>${esc(nameOf(opp))}</b>${link ? ` · ${link}` : ""}</li>`;
     }));
   const cfgP = roster.get(pid) || {};
