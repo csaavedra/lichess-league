@@ -89,7 +89,8 @@ is all it takes to keep the tournament up to date.
 - `format`: how the tournament is played. Only `"round-robin"`, the
   default, is supported for now.
 - `scoring`: points for a win, draw and loss (default 1, ½, 0).
-- `refreshSeconds`: how often to check Lichess for updates (default 300).
+- `refreshSeconds`: how often to check Lichess for updates, in seconds
+  (default 300, at least 20, at most a day).
 
 ## Standings
 

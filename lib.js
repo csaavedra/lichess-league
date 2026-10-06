@@ -185,6 +185,16 @@ export function timeControlMismatch(tc, g) {
   return tc.days ? have.days !== tc.days : have.minutes !== tc.minutes || have.increment !== tc.increment;
 }
 
+// ---------- refresh ----------
+// How often to check Lichess, from refreshSeconds in tournament.json: the
+// default unless it's a number, never so often that Lichess would slow the
+// page down, and never longer than a day (setTimeout can't wait much longer).
+const DEFAULT_REFRESH_S = 300, MIN_REFRESH_S = 20, MAX_REFRESH_S = 86400;
+export function refreshSeconds(raw) {
+  if (!Number.isFinite(raw) || !raw) return DEFAULT_REFRESH_S;
+  return Math.min(MAX_REFRESH_S, Math.max(MIN_REFRESH_S, raw));
+}
+
 // ---------- challenges ----------
 // Lichess's "challenge a friend" form, filled in and locked to the
 // tournament's settings. "color" is the side of whoever opens the link,

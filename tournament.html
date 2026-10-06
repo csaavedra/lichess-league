@@ -330,7 +330,7 @@ import {
   START_FEN, ONGOING, DAY_MS, DEFAULT_SCORING, fmtPts, plural, deadlineOf, fmtLeft, extractId, isPrivateId, summarize,
   computeStandings, scheduleMismatch, ratedMismatch, playerGames, playerStats,
   parseTimeControl, gameTimeControl, fmtTimeControl, timeControlMismatch, challengeUrl,
-  parseFormat, tournamentSpan, fmtSpan, gameDates, subtitleText,
+  parseFormat, tournamentSpan, fmtSpan, gameDates, subtitleText, refreshSeconds,
 } from "./lib.js";
 
 // chess.js is only used to replay the moves of a game. No engine is loaded anywhere on this page.
@@ -1093,7 +1093,7 @@ document.getElementById("refresh").addEventListener("click", () => refresh(true)
 
 // ---------- refresh loop ----------
 const FILE_HINT = " Browsers don't let a page opened straight from disk read other files. Serve the folder instead, for example with python3 -m http.server, and open http://localhost:8000/tournament.html.";
-const RATE_PAUSE_MS = 120000, DEFAULT_REFRESH_S = 300, MIN_REFRESH_S = 20;
+const RATE_PAUSE_MS = 120000;
 let busy = false, retryTimer = null;
 let roundSettled = false; // until the first fetch or a click, the round shown can still move to currentRound()
 async function refresh(manual) {
@@ -1157,8 +1157,7 @@ function showGames() {
 renderAll();
 refresh();
 (function loop() {
-  const secs = Math.max(MIN_REFRESH_S, config?.refreshSeconds || DEFAULT_REFRESH_S);
-  setTimeout(() => { if (!document.hidden) refresh(); loop(); }, secs * 1000);
+  setTimeout(() => { if (!document.hidden) refresh(); loop(); }, refreshSeconds(config?.refreshSeconds) * 1000);
 })();
 setInterval(() => {
   tickDeadlines();

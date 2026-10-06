@@ -5,7 +5,7 @@ import {
   START_FEN, DAY_MS, fmtPts, plural, deadlineOf, fmtLeft, extractId, isPrivateId, summarize,
   computeStandings, scheduleMismatch, ratedMismatch, playerGames, playerStats,
   parseTimeControl, gameTimeControl, fmtTimeControl, timeControlMismatch, challengeUrl,
-  parseFormat, endOf, tournamentSpan, fmtSpan, gameDates, subtitleText,
+  parseFormat, endOf, tournamentSpan, fmtSpan, gameDates, subtitleText, refreshSeconds,
 } from "./lib.js";
 
 // players: [[username, seed, seedRating]] -> the page's roster map.
@@ -429,4 +429,15 @@ test("gameDates: since or a range, only the day for a game on a clock, none when
   assert.equal(gameDates(game("a", "b", "live", { createdAt: at(10, 6), daysPerTurn: null, clock })), "October 6th, 2026");
   assert.equal(gameDates(game("a", "b", "1-0", { createdAt: at(10, 6, 23), lastMoveAt: at(10, 7, 1), daysPerTurn: null, clock })), "October 6th, 2026");
   assert.equal(gameDates(game("a", "b", "aborted", { createdAt: at(10, 1) })), null);
+});
+
+test("refreshSeconds: the default unless it's a number, kept between 20 s and a day", () => {
+  assert.equal(refreshSeconds(undefined), 300);
+  assert.equal(refreshSeconds(0), 300);
+  assert.equal(refreshSeconds(120), 120);
+  assert.equal(refreshSeconds(5), 20);
+  assert.equal(refreshSeconds(-60), 20);
+  assert.equal(refreshSeconds(1e7), 86400); // more would overflow setTimeout and fire at once
+  // These used to make the page ask Lichess again straight away, without end.
+  for (const bad of ["abc", "60", NaN, Infinity, null, {}, [60]]) assert.equal(refreshSeconds(bad), 300);
 });
