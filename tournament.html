@@ -567,16 +567,18 @@ function renderTabs() {
   }).join("");
 }
 
-// The export gives each player's rating at the start of the game.
-function ratingHTML(p) {
+// The export gives each player's rating at the start of the game, and once a
+// rated game is over, what Lichess awarded for it.
+function ratingHTML(p, withDiff) {
   if (p.rating == null) return "";
-  return ` <span class="rt">(${p.rating}${p.provisional ? "?" : ""})</span>`;
+  const diff = withDiff && p.ratingDiff != null ? ` <span class="${trend(p.ratingDiff)}">${signed(p.ratingDiff)}</span>` : "";
+  return ` <span class="rt">(${p.rating}${p.provisional ? "?" : ""})${diff}</span>`;
 }
 
-function sideHTML(p, color, g) {
+function sideHTML(p, color, g, withDiff = false) {
   const toMove = !g.result && g.turn === color;
   const score = scoreOf(g, color);
-  return `<div class="side${toMove ? " to-move" : ""}${score === 0 ? " lost" : ""}"><span class="chip ${color[0]}"></span><span class="nm">${esc(displayName(p))}${ratingHTML(p)}</span><span class="sc">${score === null ? "" : fmtPts(score)}</span></div>`;
+  return `<div class="side${toMove ? " to-move" : ""}${score === 0 ? " lost" : ""}"><span class="chip ${color[0]}"></span><span class="nm">${esc(displayName(p))}${ratingHTML(p, withDiff)}</span><span class="sc">${score === null ? "" : fmtPts(score)}</span></div>`;
 }
 
 function plainSideHTML(id, color) {
@@ -742,9 +744,9 @@ function renderDialog() {
       </div>
     </div>
     <div>
-      ${sideHTML(g.black, "black", g)}
+      ${sideHTML(g.black, "black", g, true)}
       <div class="dlg-board" id="dlg-board">${boardHTML(cur.fen, cur.last)}</div>
-      ${sideHTML(g.white, "white", g)}
+      ${sideHTML(g.white, "white", g, true)}
       <div class="controls">
         <button type="button" data-act="first" aria-label="First position">${icon("M2 3h2v10H2zM9 3v10L4 8zM14 3v10L9 8z")}</button>
         <button type="button" data-act="prev" aria-label="Previous move">${icon("M12 3v10L4 8z")}</button>
