@@ -353,7 +353,7 @@ footer a { color: inherit; text-underline-offset: 2px; }
 <script type="module">
 import {
   START_FEN, DAY_MS, fmtPts, plural, ordinal, deadlineOf, fmtLeft, summarize, parseConfig, scoreOf, KINDS,
-  roundStats, roundState, currentRound,
+  roundStats, roundState, currentRound, boardSquares, pieceMoves,
   computeStandings, scheduleMismatch, ratedMismatch, playerGames, playerStats,
   gameTimeControl, fmtTimeControl, timeControlMismatch, challengeUrl,
   tournamentSpan, fmtSpan, gameDates, subtitleText,
@@ -494,17 +494,8 @@ const standings = () => computeStandings(config.rounds, state.games, config.rost
 
 // ---------- rendering ----------
 function boardHTML(fen, last) {
-  const rows = (fen || START_FEN).split(" ")[0].split("/");
-  let html = '<div class="board" aria-hidden="true">';
-  rows.forEach((row, r) => {
-    let f = 0;
-    for (const ch of row) {
-      if (/\d/.test(ch)) {
-        for (let k = 0; k < +ch; k++, f++) html += sq(r, f, null, last);
-      } else { html += sq(r, f, ch, last); f++; }
-    }
-  });
-  return html + "</div>";
+  const squares = boardSquares(fen || START_FEN).map((p, i) => sq(i >> 3, i % 8, p, last));
+  return `<div class="board" aria-hidden="true">${squares.join("")}</div>`;
 }
 function sq(r, f, piece, last) {
   const name = "abcdefgh"[f] + (8 - r);
@@ -813,15 +804,30 @@ function step(to) {
   if (!o) return;
   const ply = Math.max(0, Math.min(o.positions.length - 1, to));
   if (ply === o.ply) return;
+  const prev = o.positions[o.ply];
   o.ply = ply;
   const d = document.getElementById("dlg");
   const cur = o.positions[ply];
-  d.querySelector("#dlg-board").innerHTML = boardHTML(cur.fen, cur.last);
+  const board = d.querySelector("#dlg-board");
+  board.innerHTML = boardHTML(cur.fen, cur.last);
+  slidePieces(board, pieceMoves(prev.fen, cur.fen));
   d.querySelectorAll(".move.cur").forEach((b) => b.classList.remove("cur"));
   const btn = d.querySelector(`.move[data-ply="${ply}"]`);
   if (btn) { btn.classList.add("cur"); showMove(btn); }
   else { const list = d.querySelector("#moves"); if (list && ply === 0) list.scrollTop = list.scrollLeft = 0; }
   updateControls();
+}
+
+// Slides the pieces from the squares they left, as pieceMoves() pairs them.
+function slidePieces(board, moves) {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const squares = board.querySelectorAll(".sq");
+  for (const [from, to] of moves) {
+    // The image fills its square, so a percentage moves it by whole squares.
+    const t = `translate(${((from % 8) - (to % 8)) * 100}%, ${((from >> 3) - (to >> 3)) * 100}%)`;
+    // z-index keeps it above the squares that come later in the grid.
+    squares[to].querySelector("img").animate([{ transform: t, zIndex: 1 }, { transform: "none", zIndex: 1 }], { duration: 200, easing: "ease-out" });
+  }
 }
 
 // ---------- player view ----------

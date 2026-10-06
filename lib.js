@@ -80,6 +80,32 @@ export function summarize(g) {
   };
 }
 
+// ---------- board ----------
+// The piece on each square of a FEN, in FEN letters from a8 to h1, or null.
+export const boardSquares = (fen) =>
+  [...fen.split(" ")[0].replace(/\//g, "").replace(/\d/g, (n) => " ".repeat(n))].map((c) => (c === " " ? null : c));
+
+// The pieces that moved between two positions, as [from, to] pairs of square
+// indexes (0 is a8, 63 is h1), to slide them. Each piece that arrived on a
+// square comes from the nearest square that a piece of its kind left, which
+// covers castling, en passant, stepping back and jumping several moves. A
+// promoted piece comes from where a pawn of its colour left.
+export function pieceMoves(fromFen, toFen) {
+  const before = boardSquares(fromFen), after = boardSquares(toFen);
+  const left = before.flatMap((p, i) => (p && p !== after[i] ? [i] : []));
+  const moves = [];
+  after.forEach((p, i) => {
+    if (!p || p === before[i]) return;
+    const dist = (j) => Math.hypot((j % 8) - (i % 8), (j >> 3) - (i >> 3));
+    const nearest = (q) => left.filter((j) => before[j] === q).sort((a, b) => dist(a) - dist(b))[0];
+    const from = nearest(p) ?? nearest(p === p.toUpperCase() ? "P" : "p");
+    if (from === undefined) return;
+    left.splice(left.indexOf(from), 1);
+    moves.push([from, i]);
+  });
+  return moves;
+}
+
 // ---------- standings ----------
 // rounds: [{ ids }], games: Map id -> summary, players: Map username -> { username, name, seed, seedRating }.
 export function computeStandings(rounds, games, players, sc = DEFAULT_SCORING) {

@@ -6,7 +6,7 @@ import {
   computeStandings, scheduleMismatch, ratedMismatch, playerGames, playerStats,
   parseTimeControl, gameTimeControl, fmtTimeControl, timeControlMismatch, challengeUrl,
   parseFormat, endOf, tournamentSpan, fmtSpan, gameDates, subtitleText, refreshSeconds, parseConfig,
-  scoreOf, ordinal, roundStats, roundState, currentRound,
+  scoreOf, ordinal, roundStats, roundState, currentRound, boardSquares, pieceMoves,
 } from "../lib.js";
 
 // players: [[username, seed, seedRating]] -> the page's roster map.
@@ -540,4 +540,32 @@ test("rounds: stats, state and the round to show first", () => {
   assert.equal(currentRound([r1, r3, r4], games), 2); // else the last one with games
   assert.equal(currentRound([r3, r3], games), 0);
   assert.equal(currentRound([], games), 0);
+});
+
+test("boardSquares reads a FEN from a8 to h1", () => {
+  const sq = boardSquares(START_FEN);
+  assert.equal(sq.length, 64);
+  assert.deepEqual([sq[0], sq[4], sq[16], sq[52], sq[63]], ["r", "k", null, "P", "R"]);
+});
+
+// Squares are indexes from a8 (0) to h1 (63): e2 is 52, e4 is 36.
+test("pieceMoves pairs the squares pieces left with those they reached", () => {
+  const e4 = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1";
+  assert.deepEqual(pieceMoves(START_FEN, e4), [[52, 36]]);
+  assert.deepEqual(pieceMoves(e4, START_FEN), [[36, 52]]); // stepping back
+  assert.deepEqual(pieceMoves(e4, e4), []);
+  // Castling moves the rook too.
+  assert.deepEqual(pieceMoves("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1", "r3k2r/8/8/8/8/8/8/R4RK1 b kq - 1 1"), [[63, 61], [60, 62]]);
+  // En passant: the captured pawn just goes.
+  assert.deepEqual(pieceMoves("4k3/8/8/3Pp3/8/8/8/4K3 w - e6 0 1", "4k3/8/4P3/8/8/8/8/4K3 b - - 0 1"), [[27, 20]]);
+  // A knight taking a knight.
+  assert.deepEqual(pieceMoves("4k3/8/8/3n4/8/4N3/8/4K3 w - - 0 1", "4k3/8/8/3N4/8/8/8/4K3 b - - 0 1"), [[44, 27]]);
+  // Jumping two moves: each knight comes from the nearer square.
+  assert.deepEqual(pieceMoves(START_FEN, "rnbqkbnr/pppppppp/8/8/8/2N2N2/PPPPPPPP/R1BQKB1R w KQkq - 4 3"), [[57, 42], [62, 45]]);
+});
+
+test("pieceMoves: a promoted piece comes from the pawn, not back", () => {
+  const before = "1n2k3/P7/8/8/8/8/8/4K3 w - - 0 1", after = "1Q2k3/8/8/8/8/8/8/4K3 b - - 0 1";
+  assert.deepEqual(pieceMoves(before, after), [[8, 1]]);
+  assert.deepEqual(pieceMoves(after, before), []);
 });
