@@ -12,6 +12,7 @@ the [README](README.md).
   DOM or network access.
 - `lib.test.js`: its tests.
 - `lichess.js`: the requests to Lichess and the cache of finished games.
+- `lichess.test.js`: tests for the requests, with a fake `fetch`.
 - `demo/`: made-up tournaments and a mock of the Lichess API.
 
 ## Tests
