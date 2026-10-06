@@ -708,6 +708,8 @@ function openGame(id, back) {
   renderDialog();
   const d = document.getElementById("dlg");
   if (!d.open) d.showModal();
+  // A closed dialog has no size, so scroll the list once it's open.
+  showMove(d.querySelector(".move.cur"));
 }
 
 function renderDialog() {
@@ -767,9 +769,19 @@ function renderDialog() {
       <a href="https://lichess.org/${esc(g.id)}" target="_blank" rel="noopener">Open on Lichess</a>
     </div>
   </div>`;
-  const curBtn = d.querySelector(".move.cur");
-  if (curBtn) curBtn.scrollIntoView({ block: "nearest" });
+  showMove(d.querySelector(".move.cur"));
   updateControls();
+}
+
+// Scrolls the move list, and only the list (scrollIntoView would also scroll
+// the dialog), to show the current move.
+function showMove(btn) {
+  if (!btn) return;
+  const list = btn.parentElement;
+  const b = btn.getBoundingClientRect(), l = list.getBoundingClientRect();
+  const top = l.top + list.clientTop, bottom = top + list.clientHeight;
+  if (b.top < top) list.scrollTop -= top - b.top;
+  else if (b.bottom > bottom) list.scrollTop += b.bottom - bottom;
 }
 
 // Buttons that can't move further look disabled. aria-disabled rather than
@@ -794,7 +806,7 @@ function step(to) {
   d.querySelector("#dlg-board").innerHTML = boardHTML(cur.fen, cur.last);
   d.querySelectorAll(".move.cur").forEach((b) => b.classList.remove("cur"));
   const btn = d.querySelector(`.move[data-ply="${ply}"]`);
-  if (btn) { btn.classList.add("cur"); btn.scrollIntoView({ block: "nearest" }); }
+  if (btn) { btn.classList.add("cur"); showMove(btn); }
   else { const list = d.querySelector("#moves"); if (list && ply === 0) list.scrollTop = 0; }
   updateControls();
 }
