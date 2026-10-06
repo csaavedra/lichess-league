@@ -116,7 +116,7 @@ table.cross { border-collapse: collapse; width: 100%; font-variant-numeric: tabu
 .cross td.res { width: 44px; font-weight: 600; }
 .cross td.self { background: var(--self); }
 .cross td.res .live { color: var(--live); font-size: 12px; }
-.cross td.res .l { color: var(--muted); font-weight: 500; }
+.cross td.res .l, .pgames td.r .l { color: var(--muted); font-weight: 500; }
 .cross td.pts { font: 700 19px/1 var(--font-display); width: 64px; }
 .cross td.minor { color: var(--muted); width: 56px; font-size: 14px; }
 .cross tbody tr:first-child td.pts { color: var(--accent); }
@@ -915,6 +915,9 @@ function openPlayer(pid) {
 // Which ratings an average used: n games, lichessN of them with a Lichess rating for want of a seed rating.
 const ratingSource = (lichessN, n) => (!lichessN ? "seed ratings" : lichessN === n ? "Lichess ratings" : "seed and Lichess ratings");
 
+// Marks a change as good or bad, for themes; the page itself only colours "up".
+const trend = (n) => (n > 0 ? "up" : n < 0 ? "down" : "");
+
 function tile(k, v, s, cls) {
   return `<div class="tile"><div class="k">${k}</div><div class="v${cls ? " " + cls : ""}">${v}</div><div class="s">${s}</div></div>`;
 }
@@ -947,12 +950,12 @@ function renderPlayer() {
 
   const tiles = [
     tile("Rank", `${rank + 1}<small>/${table.length}</small>`, `${row.tied ? `TW ${row.tiedWins} · ` : ""}SB ${fmtPts(row.sb)} · ${plural(row.wins, "win")}`),
-    seed != null ? tile("Seed", seed, moved ? `${now}, ${moved > 0 ? "up" : "down"} ${plural(Math.abs(moved), "place")}` : `${now}, as seeded`, moved > 0 ? "up" : "") : "",
+    seed != null ? tile("Seed", seed, moved ? `${now}, ${moved > 0 ? "up" : "down"} ${plural(Math.abs(moved), "place")}` : `${now}, as seeded`, trend(moved)) : "",
     tile("Points", fmtPts(st.pts), st.n ? `from ${plural(st.n, "finished game")}, ${pct}%` : "no finished games yet"),
-    tile("Won · drawn · lost", `${st.w} · ${st.d} · ${st.l}`, st.live ? `${st.live} in progress` : "none in progress"),
+    tile("Won · drawn · lost", `<span class="w">${st.w}</span> · <span class="d">${st.d}</span> · <span class="l">${st.l}</span>`, st.live ? `${st.live} in progress` : "none in progress"),
     tile("Performance", st.perf != null ? st.perf : "—", st.avgOpp != null ? `average opponent ${st.avgOpp} (${ratingSource(st.oppLichess, st.oppN)})` : "needs a finished game"),
-    rated ? tile("Rating change", st.diffN ? signed(st.diff) : "—", startRating != null ? `${startRating} at the first game` : "no rated games yet", st.diff > 0 ? "up" : "") : "",
-    tile("Against expectation", st.expN ? signed(st.frac - st.exp, 1) : "—", st.expN ? `expected ${st.exp.toFixed(1)} from ${ratingSource(st.expLichess, st.expN)}` : "needs a finished game", st.frac - st.exp > 0.05 && st.expN ? "up" : ""),
+    rated ? tile("Rating change", st.diffN ? signed(st.diff) : "—", startRating != null ? `${startRating} at the first game` : "no rated games yet", st.diffN ? trend(st.diff) : "") : "",
+    tile("Against expectation", st.expN ? signed(st.frac - st.exp, 1) : "—", st.expN ? `expected ${st.exp.toFixed(1)} from ${ratingSource(st.expLichess, st.expN)}` : "needs a finished game", st.expN && Math.abs(st.frac - st.exp) > 0.05 ? trend(st.frac - st.exp) : ""),
   ].join("");
 
   const rowsHTML = list.map(({ g, round, color, me, opp, score }) => {
@@ -963,11 +966,11 @@ function renderPlayer() {
       const left = leftHTML(g);
       note = !g.moves.length ? "Not started" : `${esc(displayName(g.turn === color ? me : opp))} to move, ${left ? `${left}, ` : ""}last move ${ago(g.lastMoveAt)}`;
     } else {
-      res = score === 1 ? "1" : score === 0 ? "0" : "½";
+      res = score === 1 ? '<span class="w">1</span>' : score === 0 ? '<span class="l">0</span>' : '<span class="d">½</span>';
       note = `${REASONS[g.status] || "finished"}${g.opening ? ", " + esc(g.opening) : ""}`;
       note = note[0].toUpperCase() + note.slice(1);
     }
-    const diff = me.ratingDiff != null ? signed(me.ratingDiff) : "";
+    const diff = me.ratingDiff != null ? `<span class="${trend(me.ratingDiff)}">${signed(me.ratingDiff)}</span>` : "";
     return `<tr tabindex="0" data-game="${esc(g.id)}">
       <td>${esc(round)}</td>
       <td class="opp"><span class="chip ${color[0]}" title="Played with ${color}"></span>${esc(displayName(opp))}${ratingHTML(opp)}</td>
