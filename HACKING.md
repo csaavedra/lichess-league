@@ -11,6 +11,7 @@ the [README](README.md).
   player stats, ID parsing, time control, time left, the subtitle), with no
   DOM or network access.
 - `lib.test.js`: its tests.
+- `lichess.js`: the requests to Lichess and the cache of finished games.
 - `demo/`: made-up tournaments and a mock of the Lichess API.
 
 ## Tests
@@ -21,6 +22,8 @@ the files as ES modules; there is nothing to install):
     node --test
 
 ## How it talks to Lichess
+
+The requests and the cache are in `lichess.js`.
 
 - Games are fetched one at a time from `/game/export/{id}`. On a 429 the page
   backs off for two minutes.

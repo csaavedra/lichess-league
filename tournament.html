@@ -327,12 +327,13 @@ footer a { color: inherit; text-underline-offset: 2px; }
 
 <script type="module">
 import {
-  START_FEN, ONGOING, DAY_MS, fmtPts, plural, ordinal, deadlineOf, fmtLeft, summarize, parseConfig, scoreOf, KINDS,
+  START_FEN, DAY_MS, fmtPts, plural, ordinal, deadlineOf, fmtLeft, summarize, parseConfig, scoreOf, KINDS,
   roundStats, roundState, currentRound,
   computeStandings, scheduleMismatch, ratedMismatch, playerGames, playerStats,
   gameTimeControl, fmtTimeControl, timeControlMismatch, challengeUrl,
   tournamentSpan, fmtSpan, gameDates, subtitleText,
 } from "./lib.js";
+import { fetchGame, fetchHistory, finishedGame, cacheFinished } from "./lichess.js";
 
 // chess.js is only used to replay the moves of a game. No engine is loaded anywhere on this page.
 // If it fails to load, the rest of the page still works; games just can't be stepped through.
@@ -415,66 +416,9 @@ function applyConfig(cfg) {
   notices.ids = cfg.warnings.join(" ");
 }
 
-// ---------- data ----------
-// One game at a time through the single-game export. The bulk endpoint
-// (/api/games/export/_ids) allows only 2 concurrent requests per IP address,
-// and Lichess can keep that slot taken long after a request ends, which
-// blocks the page for everyone on the same network.
-const rateError = () => Object.assign(new Error("rate"), { rate: true });
-const EXPORT_PARAMS = "moves=true&lastFen=true&opening=true&evals=false&clocks=false&accuracy=false&literate=false";
-async function fetchGame(id) {
-  const res = await fetch(`https://lichess.org/game/export/${id}?${EXPORT_PARAMS}`, { headers: { Accept: "application/json" } });
-  if (res.status === 404) return null;
-  if (res.status === 429) throw rateError();
-  if (!res.ok) throw new Error(`Lichess answered with status ${res.status}.`);
-  return res.json();
-}
-
-// The export API leaves out the last few moves of games in progress (an
-// anti-cheat delay), although lastFen is current. The game stream has the
-// full history, so read it until it reaches the exported position, then stop.
+// ---------- move history ----------
+// Streamed histories of games in progress (see fetchHistory in lichess.js).
 const histories = new Map(); // id -> { key, moves, positions }
-const STREAM_TIMEOUT_MS = 15000;
-
-async function fetchHistory(g) {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), STREAM_TIMEOUT_MS);
-  const target = fenKey(g.fen);
-  const list = [];
-  try {
-    const res = await fetch(`https://lichess.org/api/stream/game/${g.id}`, { signal: ctrl.signal, headers: { Accept: "application/x-ndjson" } });
-    if (res.status === 429) throw rateError();
-    if (!res.ok || !res.body) return null;
-    const reader = res.body.getReader();
-    const dec = new TextDecoder();
-    let buf = "";
-    read: for (;;) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buf += dec.decode(value, { stream: true });
-      let nl;
-      while ((nl = buf.indexOf("\n")) >= 0) {
-        const line = buf.slice(0, nl).trim();
-        buf = buf.slice(nl + 1);
-        if (!line) continue;
-        const msg = JSON.parse(line);
-        if (!msg.fen || msg.id) continue; // the first line is the game itself
-        list.push(msg);
-        if (fenKey(msg.fen) === target && (msg.lm || null) === g.lastUci) break read;
-      }
-    }
-  } catch (err) {
-    if (err.rate) throw err;
-    return null;
-  } finally {
-    clearTimeout(timer);
-    ctrl.abort();
-  }
-  if (!list.length || fenKey(list[list.length - 1].fen) !== target) return null;
-  return historyFromStream(list);
-}
-
-function fenKey(fen) { return String(fen || "").split(" ").slice(0, 2).join(" "); }
 
 // chess.js throws on an illegal move; return null instead.
 function tryMove(c, move) {
@@ -507,25 +451,13 @@ async function updateHistories() {
     if (g.result || !g.lastUci) continue;
     const h = histories.get(g.id);
     if (h && h.key === g.fen) continue;
-    const fresh = await fetchHistory(g);
+    const list = await fetchHistory(g);
+    const fresh = list && historyFromStream(list);
     if (!fresh) continue;
     histories.set(g.id, { key: g.fen, ...fresh });
     withHistory(g);
     renderAll();
   }
-}
-
-// Finished games never change, so keep them in this browser and only ask
-// Lichess for games still in progress (or not seen yet).
-const CACHE_KEY = "tournament:finished-games:v3";
-const finishedCache = (() => {
-  try { return JSON.parse(localStorage.getItem(CACHE_KEY)) || {}; } catch { return {}; }
-})();
-function cacheFinished(g) {
-  if (ONGOING.has(g.status)) return;
-  const { id, rated, status, winner, players, moves, lastFen, lastMove, lastMoveAt, createdAt, opening, daysPerTurn, clock } = g;
-  finishedCache[id] = { id, rated, status, winner, players, moves, lastFen, lastMove, lastMoveAt, createdAt, opening, daysPerTurn, clock };
-  try { localStorage.setItem(CACHE_KEY, JSON.stringify(finishedCache)); } catch { /* storage full or blocked */ }
 }
 
 const seedOf = (id) => config.roster.get(id)?.seed ?? null;
@@ -1048,12 +980,12 @@ async function refresh(manual) {
     if (!state.lastUpdate) { showGames(); renderAll(); }
     if (!manual && Date.now() < state.pausedUntil) return;
     renderSync("Updating…");
-    for (const id of config.allIds.filter((id) => !finishedCache[id])) {
+    for (const id of config.allIds.filter((id) => !finishedGame(id))) {
       const raw = await fetchGame(id);
       if (!raw) { notFound.add(id); continue; }
       notFound.delete(id);
       cacheFinished(raw);
-      if (finishedCache[id]) liveGames.delete(id); else liveGames.set(id, raw);
+      if (finishedGame(id)) liveGames.delete(id); else liveGames.set(id, raw);
     }
     showGames();
     if (!roundSettled) { state.round = currentRound(config.rounds, state.games); roundSettled = true; }
@@ -1082,7 +1014,7 @@ async function refresh(manual) {
 }
 
 function showGames() {
-  const games = config.allIds.map((id) => finishedCache[id] || liveGames.get(id)).filter(Boolean);
+  const games = config.allIds.map((id) => finishedGame(id) || liveGames.get(id)).filter(Boolean);
   state.games = new Map(games.map((g) => [g.id, withHistory(summarize(g))]));
 }
 
