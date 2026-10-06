@@ -8,7 +8,7 @@ the [README](README.md).
 - `tournament.html`: the page, with its styles and one inline
   `<script type="module">`. There is no build step.
 - `lib.js`: the pure logic (standings, tiebreaks, player stats, ID parsing,
-  time control, time left), with no DOM or network access.
+  time control, time left, the subtitle), with no DOM or network access.
 - `lib.test.js`: its tests.
 - `demo/`: made-up tournaments and a mock of the Lichess API.
 

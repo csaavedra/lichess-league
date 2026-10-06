@@ -1,6 +1,5 @@
 {
   "title": "Demo: halfway",
-  "subtitle": "Rounds 1 and 2 finished, a slow game left in round 3, round 4 half played, round 5 just paired",
 
   "players": [
     { "username": "player1", "name": "Alice", "seed": 1, "seedRating": 2000, "seedBasis": "Correspondence" },

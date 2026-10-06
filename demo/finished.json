@@ -1,6 +1,5 @@
 {
   "title": "Demo: finished",
-  "subtitle": "Every game played, with ties in the standings",
 
   "players": [
     { "username": "player1", "name": "Alice", "seed": 1, "seedRating": 2000, "seedBasis": "Correspondence" },
