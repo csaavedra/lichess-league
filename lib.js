@@ -1,5 +1,5 @@
 // Pure logic for tournament.html: no DOM, no network, no module state.
-// Tested by lib.test.js (node --test).
+// Tested by test/lib.test.js (node --test).
 
 export const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 export const ONGOING = new Set(["created", "started"]);

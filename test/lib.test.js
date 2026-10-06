@@ -7,7 +7,7 @@ import {
   parseTimeControl, gameTimeControl, fmtTimeControl, timeControlMismatch, challengeUrl,
   parseFormat, endOf, tournamentSpan, fmtSpan, gameDates, subtitleText, refreshSeconds, parseConfig,
   scoreOf, ordinal, roundStats, roundState, currentRound,
-} from "./lib.js";
+} from "../lib.js";
 
 // players: [[username, seed, seedRating]] -> the page's roster map.
 function playersMap(list) {
