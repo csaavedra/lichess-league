@@ -9,6 +9,8 @@ It's a single page that you put on any static host. There is no server, no
 database and no account to create. For now it handles round-robin
 tournaments.
 
+<img src="screenshots/standings.png" width="640" alt="Standings of a tournament halfway through">
+
 ## What the page shows
 
 - A crosstable with points, tiebreaks and games played. A green dot marks a
@@ -34,6 +36,8 @@ the page checks every game against the schedule and warns when:
 - the time control isn't the tournament's;
 - a game ID is wrong, or includes a player's private token (see below);
 - a player in the schedule is missing from the player list.
+
+<img src="screenshots/games.png" width="640" alt="A round with games that don't match the schedule">
 
 ## Running a tournament
 
