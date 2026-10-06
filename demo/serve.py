@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """Serves the page with made-up games, to see how it looks without real ones.
 
-    python3 demo/serve.py [port]
+    python3 demo/serve.py [--theme DIR] [port]
 
 Then open http://localhost:8000/demo/. Each scenario NAME.json in this folder
 is a tournament file served at /demo/NAME/, where demo/mock.js answers the
-page's Lichess requests from the "demo" field of each game.
+page's Lichess requests from the "demo" field of each game. With --theme, the
+pages use the theme in DIR instead of theme/.
 """
-import http.server, pathlib, re, sys
+import argparse, http.server, pathlib, re
 
 DEMO = pathlib.Path(__file__).resolve().parent
 ROOT = DEMO.parent
@@ -45,6 +46,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self.reply(html.encode(), "text/html; charset=utf-8")
         if rest == "tournament.json":
             return self.reply((DEMO / f"{name}.json").read_bytes(), "application/json")
+        if THEME and rest.startswith("theme/"):
+            self.path = "/" + str(THEME.relative_to(ROOT)) + rest[len("theme"):]
+            return super().do_GET()
         # lib.js, theme/ and anything else the page loads come from the repository.
         self.path = "/" + rest
         return super().do_GET()
@@ -56,7 +60,14 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                    f"<h1>Demo scenarios</h1><ul>{links}</ul>".encode(), "text/html; charset=utf-8")
 
 
-port = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
+parser = argparse.ArgumentParser(description="Serve the demo scenarios.")
+parser.add_argument("port", nargs="?", type=int, default=8000)
+parser.add_argument("--theme", type=pathlib.Path, help="theme folder to use instead of theme/")
+args = parser.parse_args()
+THEME = args.theme.resolve() if args.theme else None
+if THEME and not (THEME.is_dir() and THEME.is_relative_to(ROOT)):
+    parser.error("the theme has to be a folder inside the repository")
+port = args.port
 print(f"Demo scenarios at http://localhost:{port}/demo/")
 # Local only: the server hands out the whole checkout, theme/ and tournament.json included.
 http.server.ThreadingHTTPServer(("localhost", port), Handler).serve_forever()
