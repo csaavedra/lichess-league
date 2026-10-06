@@ -276,8 +276,18 @@ footer a { color: inherit; text-underline-offset: 2px; }
 
 @media (max-width: 720px) {
   .wrap { padding: 20px 14px 48px; }
-  .dlg { grid-template-columns: 1fr; padding: 16px; }
-  .moves { max-height: 34vh; }
+  .dlg { padding: 16px; }
+  /* One column, with the moves as a strip under the board. The two panels
+     give their children to .dlg, which puts them in order. */
+  .gdlg { display: flex; flex-direction: column; gap: 0; }
+  .dlg .board-panel, .dlg .side-panel { display: contents; }
+  .gdlg .head { margin-bottom: 16px; }
+  .dlg .controls, .dlg .keys { order: 2; }
+  .dlg .status, .dlg .opening, .dlg .side-panel > a { order: 3; margin-top: 12px; }
+  .dlg .status { margin-top: 20px; }
+  .moves { order: 1; display: flex; overflow: auto hidden; margin-top: 10px; }
+  .moves .no { flex: none; background: none; padding: 5px 2px 5px 8px; }
+  .moves .move { flex: none; padding: 5px 8px; }
   .games { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
 }
 @media (prefers-reduced-motion: no-preference) {
@@ -739,7 +749,7 @@ function renderDialog() {
   movesHTML += "</div>";
 
   const d = document.getElementById("dlg");
-  d.innerHTML = `<div class="dlg">
+  d.innerHTML = `<div class="dlg gdlg">
     <div class="head">
       <div>
         <h3 id="dlg-title">${esc(displayName(g.white))} against ${esc(displayName(g.black))}</h3>
@@ -750,7 +760,7 @@ function renderDialog() {
         <button type="button" data-act="close">Close</button>
       </div>
     </div>
-    <div>
+    <div class="board-panel">
       ${sideHTML(g.black, "black", g, true)}
       <div class="dlg-board" id="dlg-board">${boardHTML(cur.fen, cur.last)}</div>
       ${sideHTML(g.white, "white", g, true)}
@@ -774,14 +784,17 @@ function renderDialog() {
 }
 
 // Scrolls the move list, and only the list (scrollIntoView would also scroll
-// the dialog), to show the current move.
+// the dialog), to show the current move. In the strip on a phone, the move goes
+// to the middle so that the moves around it show too.
 function showMove(btn) {
   if (!btn) return;
   const list = btn.parentElement;
   const b = btn.getBoundingClientRect(), l = list.getBoundingClientRect();
   const top = l.top + list.clientTop, bottom = top + list.clientHeight;
+  const left = l.left + list.clientLeft, right = left + list.clientWidth;
   if (b.top < top) list.scrollTop -= top - b.top;
   else if (b.bottom > bottom) list.scrollTop += b.bottom - bottom;
+  if (b.left < left || b.right > right) list.scrollLeft += (b.left + b.right - left - right) / 2;
 }
 
 // Buttons that can't move further look disabled. aria-disabled rather than
@@ -807,7 +820,7 @@ function step(to) {
   d.querySelectorAll(".move.cur").forEach((b) => b.classList.remove("cur"));
   const btn = d.querySelector(`.move[data-ply="${ply}"]`);
   if (btn) { btn.classList.add("cur"); showMove(btn); }
-  else { const list = d.querySelector("#moves"); if (list && ply === 0) list.scrollTop = 0; }
+  else { const list = d.querySelector("#moves"); if (list && ply === 0) list.scrollTop = list.scrollLeft = 0; }
   updateControls();
 }
 
