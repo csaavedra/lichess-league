@@ -321,3 +321,55 @@ export function playerStats(list, players, sc = DEFAULT_SCORING) {
   st.avgOpp = st.oppN ? Math.round(st.oppSum / st.oppN) : null;
   return st;
 }
+
+// ---------- tournament.json ----------
+// Everything the page uses from tournament.json, already parsed, with
+// defaults filled in. warnings: problems with the file, as sentences.
+export function parseConfig(cfg) {
+  // Each game is a scheduled pairing { white, black, id }; the id stays
+  // empty until the game is created on Lichess.
+  const user = (u) => String(u || "").trim().toLowerCase();
+  const rounds = (Array.isArray(cfg.rounds) ? cfg.rounds : []).map((r, i) => {
+    const slots = (r.games || []).map((x) => {
+      const raw = String(x.id || "").trim();
+      return { white: user(x.white), black: user(x.black), raw, id: raw ? extractId(raw) : null };
+    });
+    return { name: r.name || `Round ${i + 1}`, slots, ids: slots.map((x) => x.id).filter(Boolean) };
+  });
+  const num = (n) => (Number.isFinite(n) ? n : null);
+  const roster = new Map(
+    (cfg.players || []).filter((p) => p.username).map((p) => [p.username.toLowerCase(), {
+      username: p.username, name: p.name || "",
+      seed: num(p.seed), seedRating: num(p.seedRating), seedBasis: p.seedBasis || "",
+    }])
+  );
+  const tc = parseTimeControl(cfg.timeControl);
+  const fmt = parseFormat(cfg.format);
+
+  const allSlots = rounds.flatMap((r) => r.slots);
+  const badIds = allSlots.filter((x) => x.raw && !x.id).map((x) => x.raw);
+  // Name these by their first 8 characters only, so the page doesn't show the token itself.
+  const privateIds = allSlots.filter((x) => isPrivateId(x.raw)).map((x) => x.id);
+  const unknown = [...new Set(allSlots.flatMap((x) => [x.white, x.black]).filter((u) => !roster.has(u)))];
+  const warnings = [];
+  if (unknown.length) warnings.push(`These usernames appear in the schedule in tournament.json but not in its players list: ${unknown.map((u) => u || "(empty)").join(", ")}.`);
+  if (privateIds.length) warnings.push(`These game IDs in tournament.json include a player's private token: ${privateIds.join(", ")}. Keep only their first 8 characters. The extra 4 let anyone move for that player, and should never be shared.`);
+  if (badIds.length) warnings.push(`These entries in tournament.json are not valid Lichess game IDs and were skipped: ${badIds.join(", ")}.`);
+  if (tc.error) warnings.push(tc.error);
+  if (fmt.error) warnings.push(fmt.error);
+
+  return {
+    title: cfg.title || "Correspondence round-robin",
+    // null to build one from the settings and the games.
+    subtitle: typeof cfg.subtitle === "string" ? cfg.subtitle : null,
+    rounds,
+    allIds: [...new Set(rounds.flatMap((r) => r.ids))],
+    roster,
+    scoring: { ...DEFAULT_SCORING, ...cfg.scoring },
+    rated: cfg.rated !== false,
+    timeControl: tc.tc,
+    format: fmt.format,
+    refreshSeconds: refreshSeconds(cfg.refreshSeconds),
+    warnings,
+  };
+}
