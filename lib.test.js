@@ -5,7 +5,7 @@ import {
   START_FEN, DAY_MS, fmtPts, plural, deadlineOf, fmtLeft, extractId, isPrivateId, summarize,
   computeStandings, scheduleMismatch, ratedMismatch, playerGames, playerStats,
   parseTimeControl, gameTimeControl, fmtTimeControl, timeControlMismatch, challengeUrl,
-  parseFormat, endOf, tournamentSpan, fmtSpan, subtitleText,
+  parseFormat, endOf, tournamentSpan, fmtSpan, gameDates, subtitleText,
 } from "./lib.js";
 
 // players: [[username, seed, seedRating]] -> the page's roster map.
@@ -417,4 +417,16 @@ test("subtitleText", () => {
   assert.equal(subtitleText(base), "Rated · round-robin · 3 days per move · since October 1st, 2026");
   assert.equal(subtitleText({ ...base, rated: false, timeControl: { minutes: 15, increment: 10 } }), "Unrated · round-robin · 15 min + 10 s per move · since October 1st, 2026");
   assert.equal(subtitleText({ ...base, format: null, timeControl: null, span: null }), "Rated");
+});
+
+test("gameDates: since or a range, only the day for a game on a clock, none when void", () => {
+  const at = (m, d, h = 12) => new Date(2026, m - 1, d, h).getTime();
+  const clock = { initial: 900, increment: 10 };
+  assert.equal(gameDates(game("a", "b", "live", { createdAt: at(10, 1), lastMoveAt: at(10, 3) })), "since October 1st, 2026");
+  assert.equal(gameDates(game("a", "b", "0-1", { createdAt: at(10, 1), lastMoveAt: at(10, 4) })), "October 1st – 4th, 2026");
+  assert.equal(gameDates(game("a", "b", "1-0", { createdAt: at(10, 1), lastMoveAt: at(10, 4), status: "outoftime" })), "October 1st – 7th, 2026");
+  assert.equal(gameDates(game("a", "b", "½-½", { createdAt: at(10, 1, 9), lastMoveAt: at(10, 1, 20) })), "October 1st, 2026");
+  assert.equal(gameDates(game("a", "b", "live", { createdAt: at(10, 6), daysPerTurn: null, clock })), "October 6th, 2026");
+  assert.equal(gameDates(game("a", "b", "1-0", { createdAt: at(10, 6, 23), lastMoveAt: at(10, 7, 1), daysPerTurn: null, clock })), "October 6th, 2026");
+  assert.equal(gameDates(game("a", "b", "aborted", { createdAt: at(10, 1) })), null);
 });

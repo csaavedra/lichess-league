@@ -330,7 +330,7 @@ import {
   START_FEN, ONGOING, DAY_MS, DEFAULT_SCORING, fmtPts, plural, deadlineOf, fmtLeft, extractId, isPrivateId, summarize,
   computeStandings, scheduleMismatch, ratedMismatch, playerGames, playerStats,
   parseTimeControl, gameTimeControl, fmtTimeControl, timeControlMismatch, challengeUrl,
-  parseFormat, tournamentSpan, fmtSpan, subtitleText,
+  parseFormat, tournamentSpan, fmtSpan, gameDates, subtitleText,
 } from "./lib.js";
 
 // chess.js is only used to replay the moves of a game. No engine is loaded anywhere on this page.
@@ -859,7 +859,7 @@ function renderDialog() {
     <div class="head">
       <div>
         <h3 id="dlg-title">${esc(displayName(g.white))} against ${esc(displayName(g.black))}</h3>
-        <p>${esc(rName)}, ${fmtTimeControl(gameTimeControl(g))}</p>
+        <p>${esc([rName, fmtTimeControl(gameTimeControl(g)), gameDates(g)].filter(Boolean).join(" · "))}</p>
       </div>
       <div class="actions">
         ${state.open.back ? `<button type="button" data-act="back">← ${esc(nameOf(state.open.back))}</button>` : ""}

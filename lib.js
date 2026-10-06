@@ -245,6 +245,13 @@ export function fmtSpan({ start, end }) {
   return full(a);
 }
 
+// One game's dates. A game on a clock only needs the day it started.
+export function gameDates(g) {
+  if (g.result === "void") return null;
+  if (g.clock) return fmtSpan({ start: g.createdAt, end: g.createdAt });
+  return fmtSpan({ start: g.createdAt, end: g.result ? endOf(g) : null });
+}
+
 // span: fmtSpan()'s text, or null to leave the dates out.
 export function subtitleText({ rated, format, timeControl, span }) {
   return [rated ? "Rated" : "Unrated", format, timeControl && fmtTimeControl(timeControl), span].filter(Boolean).join(" · ");
