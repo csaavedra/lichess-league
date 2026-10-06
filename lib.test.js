@@ -6,6 +6,7 @@ import {
   computeStandings, scheduleMismatch, ratedMismatch, playerGames, playerStats,
   parseTimeControl, gameTimeControl, fmtTimeControl, timeControlMismatch, challengeUrl,
   parseFormat, endOf, tournamentSpan, fmtSpan, gameDates, subtitleText, refreshSeconds, parseConfig,
+  scoreOf, ordinal, roundStats, roundState, currentRound,
 } from "./lib.js";
 
 // players: [[username, seed, seedRating]] -> the page's roster map.
@@ -510,4 +511,33 @@ test("parseConfig: warnings", () => {
   assert.match(c.warnings[4], /format/);
   assert.equal(c.timeControl, null);
   assert.equal(c.format, null);
+});
+
+test("scoreOf: each side's score, none while live or when aborted", () => {
+  assert.deepEqual(["1-0", "0-1", "½-½", "live", "aborted"].map((r) => {
+    const g = game("a", "b", r);
+    return [scoreOf(g, "white"), scoreOf(g, "black")];
+  }), [[1, 0], [0, 1], [0.5, 0.5], [null, null], [null, null]]);
+});
+
+test("ordinal", () => {
+  assert.deepEqual([1, 2, 3, 4, 11, 12, 13, 21, 22, 23, 101, 111].map(ordinal),
+    ["1st", "2nd", "3rd", "4th", "11th", "12th", "13th", "21st", "22nd", "23rd", "101st", "111th"]);
+});
+
+test("rounds: stats, state and the round to show first", () => {
+  const done = game("a", "b", "1-0"), aborted = game("c", "d", "aborted"), live = game("a", "c", "live");
+  const games = new Map([done, aborted, live].map((g) => [g.id, g]));
+  const round = (...ids) => ({ ids: ids.filter(Boolean), slots: ids.map((id) => ({ id })) });
+  const r1 = round(done.id, aborted.id), r2 = round(live.id, null), r3 = round(null, null), r4 = round("missing1");
+
+  assert.deepEqual(roundStats(r1, games), { done: 2, live: 0, total: 2, waiting: 0 });
+  assert.deepEqual(roundStats(r2, games), { done: 0, live: 1, total: 2, waiting: 1 });
+  assert.deepEqual(roundStats(r4, games), { done: 0, live: 0, total: 1, waiting: 0 });
+  assert.deepEqual([r1, r2, r3, r4, round()].map((r) => roundState(roundStats(r, games))), ["done", "live", "upcoming", "upcoming", "upcoming"]);
+
+  assert.equal(currentRound([r1, r2, r3], games), 1); // the round in progress
+  assert.equal(currentRound([r1, r3, r4], games), 2); // else the last one with games
+  assert.equal(currentRound([r3, r3], games), 0);
+  assert.equal(currentRound([], games), 0);
 });
