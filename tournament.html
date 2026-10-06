@@ -327,10 +327,10 @@ footer a { color: inherit; text-underline-offset: 2px; }
 
 <script type="module">
 import {
-  START_FEN, ONGOING, DAY_MS, DEFAULT_SCORING, fmtPts, plural, deadlineOf, fmtLeft, extractId, isPrivateId, summarize,
+  START_FEN, ONGOING, DAY_MS, fmtPts, plural, deadlineOf, fmtLeft, summarize, parseConfig,
   computeStandings, scheduleMismatch, ratedMismatch, playerGames, playerStats,
-  parseTimeControl, gameTimeControl, fmtTimeControl, timeControlMismatch, challengeUrl,
-  parseFormat, tournamentSpan, fmtSpan, gameDates, subtitleText, refreshSeconds,
+  gameTimeControl, fmtTimeControl, timeControlMismatch, challengeUrl,
+  tournamentSpan, fmtSpan, gameDates, subtitleText,
 } from "./lib.js";
 
 // chess.js is only used to replay the moves of a game. No engine is loaded anywhere on this page.
@@ -384,8 +384,8 @@ function tickDeadlines() {
 }
 
 // ---------- config parsing ----------
-let config = null, configText = null;
-let rounds = [], allIds = [], roster = new Map(), scoring = DEFAULT_SCORING, rated = true, timeControl = null, format = "round-robin";
+// parseConfig()'s result. The empty one stands in until tournament.json loads.
+let config = parseConfig({}), configText = null;
 const notices = { config: "", ids: "", schedule: "", fetch: "" };
 const liveGames = new Map(); // id -> latest export of a game not finished yet
 const notFound = new Set();
@@ -396,60 +396,20 @@ async function loadConfig() {
   if (!res.ok) throw new Error(`The server answered with status ${res.status}.`);
   const text = await res.text();
   if (text === configText) return false;
-  let cfg;
-  try { cfg = JSON.parse(text); }
+  let json;
+  try { json = JSON.parse(text); }
   catch (err) { throw new Error(`It is not valid JSON: ${err.message}`); }
   configText = text;
-  applyConfig(cfg);
+  applyConfig(parseConfig(json));
   return true;
 }
 
 function applyConfig(cfg) {
   config = cfg;
-  const cfgRounds = Array.isArray(cfg.rounds) ? cfg.rounds : [];
-  // Each game is a scheduled pairing { white, black, id }; the id stays
-  // empty until the game is created on Lichess.
-  const user = (u) => String(u || "").trim().toLowerCase();
-  rounds = cfgRounds.map((r, i) => {
-    const slots = (r.games || []).map((x) => {
-      const raw = String(x.id || "").trim();
-      return { white: user(x.white), black: user(x.black), raw, id: raw ? extractId(raw) : null };
-    });
-    return { name: r.name || `Round ${i + 1}`, slots, ids: slots.map((x) => x.id).filter(Boolean) };
-  });
-  allIds = [...new Set(rounds.flatMap((r) => r.ids))];
-  const num = (n) => (Number.isFinite(n) ? n : null);
-  roster = new Map(
-    (cfg.players || []).filter((p) => p.username).map((p) => [p.username.toLowerCase(), {
-      username: p.username, name: p.name || "",
-      seed: num(p.seed), seedRating: num(p.seedRating), seedBasis: p.seedBasis || "",
-    }])
-  );
-  scoring = { ...DEFAULT_SCORING, ...cfg.scoring };
-  rated = cfg.rated !== false;
-  const tcSetting = parseTimeControl(cfg.timeControl);
-  timeControl = tcSetting.tc;
-  const formatSetting = parseFormat(cfg.format);
-  format = formatSetting.format;
-
-  const title = cfg.title || "Correspondence round-robin";
-  document.getElementById("title").textContent = title;
-  document.title = title;
-
-  if (state.round === null || state.round >= rounds.length) state.round = currentRound();
-
-  const allSlots = rounds.flatMap((r) => r.slots);
-  const badIds = allSlots.filter((x) => x.raw && !x.id).map((x) => x.raw);
-  // Name these by their first 8 characters only, so the page doesn't show the token itself.
-  const privateIds = allSlots.filter((x) => isPrivateId(x.raw)).map((x) => x.id);
-  const unknown = [...new Set(allSlots.flatMap((x) => [x.white, x.black]).filter((u) => !roster.has(u)))];
-  const warnings = [];
-  if (unknown.length) warnings.push(`These usernames appear in the schedule in tournament.json but not in its players list: ${unknown.map((u) => u || "(empty)").join(", ")}.`);
-  if (privateIds.length) warnings.push(`These game IDs in tournament.json include a player's private token: ${privateIds.join(", ")}. Keep only their first 8 characters. The extra 4 let anyone move for that player, and should never be shared.`);
-  if (badIds.length) warnings.push(`These entries in tournament.json are not valid Lichess game IDs and were skipped: ${badIds.join(", ")}.`);
-  if (tcSetting.error) warnings.push(tcSetting.error);
-  if (formatSetting.error) warnings.push(formatSetting.error);
-  notices.ids = warnings.join(" ");
+  document.getElementById("title").textContent = cfg.title;
+  document.title = cfg.title;
+  if (state.round === null || state.round >= cfg.rounds.length) state.round = currentRound();
+  notices.ids = cfg.warnings.join(" ");
 }
 
 // ---------- data ----------
@@ -565,13 +525,13 @@ function cacheFinished(g) {
   try { localStorage.setItem(CACHE_KEY, JSON.stringify(finishedCache)); } catch { /* storage full or blocked */ }
 }
 
-const seedOf = (id) => roster.get(id)?.seed ?? null;
+const seedOf = (id) => config.roster.get(id)?.seed ?? null;
 const ordinal = (n) => n + ((n % 100 >= 11 && n % 100 <= 13) ? "th" : ["th", "st", "nd", "rd"][n % 10] || "th");
 // A player from a game (Lichess has the right capitalisation), or a username from the schedule.
-const displayName = (p) => roster.get(p.id)?.name || p.username;
-const nameOf = (id) => roster.get(id)?.name || roster.get(id)?.username || id;
+const displayName = (p) => config.roster.get(p.id)?.name || p.username;
+const nameOf = (id) => config.roster.get(id)?.name || config.roster.get(id)?.username || id;
 
-const standings = () => computeStandings(rounds, state.games, roster, scoring);
+const standings = () => computeStandings(config.rounds, state.games, config.roster, config.scoring);
 
 // ---------- rendering ----------
 function boardHTML(fen, last) {
@@ -644,9 +604,9 @@ function roundState(st) {
 
 // The first round with a game in progress, else the last round with any games.
 function currentRound() {
-  const live = rounds.findIndex((r) => roundStats(r).live);
+  const live = config.rounds.findIndex((r) => roundStats(r).live);
   if (live >= 0) return live;
-  return Math.max(0, rounds.findLastIndex((r) => r.ids.length));
+  return Math.max(0, config.rounds.findLastIndex((r) => r.ids.length));
 }
 
 // A game whose players or colours differ from its slot in the schedule,
@@ -657,14 +617,14 @@ function mismatchText(slot, g) {
   const want = `${nameOf(slot.white)} (white) against ${nameOf(slot.black)} (black)`;
   if (kind === "reversed") msgs.push(`Colours are reversed: the schedule has ${want}.`);
   else if (kind) msgs.push(`This is not the scheduled game: the schedule has ${want}.`);
-  if (ratedMismatch(rated, g)) msgs.push(rated ? "This game is unrated: the tournament is rated." : "This game is rated: the tournament is unrated.");
-  if (timeControlMismatch(timeControl, g)) msgs.push(`This game has ${fmtTimeControl(gameTimeControl(g))}: the tournament has ${fmtTimeControl(timeControl)}.`);
+  if (ratedMismatch(config.rated, g)) msgs.push(config.rated ? "This game is unrated: the tournament is rated." : "This game is rated: the tournament is unrated.");
+  if (timeControlMismatch(config.timeControl, g)) msgs.push(`This game has ${fmtTimeControl(gameTimeControl(g))}: the tournament has ${fmtTimeControl(config.timeControl)}.`);
   return msgs.join(" ");
 }
 
 function scheduleNotice() {
   const issues = [];
-  rounds.forEach((r) => r.slots.forEach((slot) => {
+  config.rounds.forEach((r) => r.slots.forEach((slot) => {
     const msg = mismatchText(slot, slot.id && state.games.get(slot.id));
     if (msg) issues.push(`${r.name}, game ${slot.id}: ${msg}`);
   }));
@@ -675,7 +635,7 @@ const ROUND_LABELS = { upcoming: "not started", live: "in progress", done: "fini
 
 function renderTabs() {
   const el = document.getElementById("tabs");
-  el.innerHTML = rounds.map((r, i) => {
+  el.innerHTML = config.rounds.map((r, i) => {
     const st = roundStats(r);
     const kind = roundState(st);
     const label = ROUND_LABELS[kind];
@@ -721,12 +681,12 @@ function statusText(g) {
 // Empty when the schedule is missing a player.
 function challengeLink(slot, text) {
   if (!slot.white || !slot.black) return "";
-  const url = challengeUrl(slot, { rated, timeControl });
+  const url = challengeUrl(slot, config);
   return `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(text)}</a>`;
 }
 
 function renderGames() {
-  const r = rounds[state.round];
+  const r = config.rounds[state.round];
   const el = document.getElementById("games");
   const meta = document.getElementById("round-meta");
   if (!r) { el.innerHTML = ""; meta.textContent = ""; return; }
@@ -744,7 +704,7 @@ function renderGames() {
       const link = !slot.raw && challengeLink(slot, `${nameOf(slot.white)}, challenge ${nameOf(slot.black)} on Lichess`);
       let status = "<b>Not started yet.</b>";
       if (slot.id) status = `Game <b>${esc(slot.id)}</b> ${notFound.has(slot.id) ? "was not found on Lichess. Check the ID." : "is loading…"}`;
-      else if (link) status += ` White sends the challenge: ${link}.${timeControl ? "" : " Pick the time control there."}`;
+      else if (link) status += ` White sends the challenge: ${link}.${config.timeControl ? "" : " Pick the time control there."}`;
       return `<div class="game pending">
         ${plainSideHTML(slot.black, "black")}
         ${boardHTML(START_FEN, null)}
@@ -782,12 +742,12 @@ function renderNotice() {
 // A subtitle in tournament.json replaces the one built from the settings.
 // The dates wait until every game has loaded.
 function renderSubtitle() {
-  if (!config) return;
+  if (configText === null) return;
   let text = config.subtitle;
-  if (typeof text !== "string") {
-    const loading = allIds.some((id) => !state.games.has(id) && !notFound.has(id));
-    const span = loading ? null : fmtSpan(tournamentSpan(rounds.flatMap((r) => r.slots), state.games));
-    text = subtitleText({ rated, format, timeControl, span });
+  if (text === null) {
+    const loading = config.allIds.some((id) => !state.games.has(id) && !notFound.has(id));
+    const span = loading ? null : fmtSpan(tournamentSpan(config.rounds.flatMap((r) => r.slots), state.games));
+    text = subtitleText({ ...config, span });
   }
   document.getElementById("subtitle").textContent = text;
 }
@@ -841,7 +801,7 @@ function renderDialog() {
   }
   const ply = state.open.ply;
   const cur = state.open.positions[ply];
-  const rName = rounds.find((r) => r.ids.includes(id))?.name || "";
+  const rName = config.rounds.find((r) => r.ids.includes(id))?.name || "";
 
   let movesHTML = '<div class="moves" id="moves">';
   for (let i = 0; i < g.moves.length; i += 2) {
@@ -945,12 +905,12 @@ function renderPlayer() {
   const rank = table.findIndex((p) => p.id === pid);
   const row = table[rank];
   if (!row) return;
-  const list = playerGames(pid, rounds, state.games);
-  const st = playerStats(list, roster, scoring);
+  const list = playerGames(pid, config.rounds, state.games);
+  const st = playerStats(list, config.roster, config.scoring);
   const nm = displayName(row);
   const firstGame = [...list].sort((a, b) => (a.g.createdAt || 0) - (b.g.createdAt || 0))[0];
   const startRating = firstGame?.me.rating ?? null;
-  const toPlay = rounds.flatMap((r) => r.slots
+  const toPlay = config.rounds.flatMap((r) => r.slots
     .filter((x) => !x.id && (x.white === pid || x.black === pid))
     .map((x) => {
       const color = x.white === pid ? "white" : "black";
@@ -958,7 +918,7 @@ function renderPlayer() {
       const link = color === "white" && !x.raw ? challengeLink(x, "challenge") : "";
       return `<li><span class="chip ${color[0]}" title="With ${color}"></span>${esc(r.name)} · <b>${esc(nameOf(opp))}</b>${link ? ` · ${link}` : ""}</li>`;
     }));
-  const cfgP = roster.get(pid) || {};
+  const cfgP = config.roster.get(pid) || {};
   const seed = cfgP.seed ?? null;
   const moved = seed != null ? seed - (rank + 1) : 0;
   const pct = st.n ? Math.round((st.frac / st.n) * 100) : null;
@@ -971,7 +931,7 @@ function renderPlayer() {
     tile("Points", fmtPts(st.pts), st.n ? `from ${plural(st.n, "finished game")}, ${pct}%` : "no finished games yet"),
     tile("Won · drawn · lost", `<span class="w">${st.w}</span> · <span class="d">${st.d}</span> · <span class="l">${st.l}</span>`, st.live ? `${st.live} in progress` : "none in progress"),
     tile("Performance", st.perf != null ? st.perf : "—", st.avgOpp != null ? `average opponent ${st.avgOpp} (${ratingSource(st.oppLichess, st.oppN)})` : "needs a finished game"),
-    rated ? tile("Rating change", st.diffN ? signed(st.diff) : "—", startRating != null ? `${startRating} at the first game` : "no rated games yet", st.diffN ? trend(st.diff) : "") : "",
+    config.rated ? tile("Rating change", st.diffN ? signed(st.diff) : "—", startRating != null ? `${startRating} at the first game` : "no rated games yet", st.diffN ? trend(st.diff) : "") : "",
     tile("Against expectation", st.expN ? signed(st.frac - st.exp, 1) : "—", st.expN ? `expected ${st.exp.toFixed(1)} from ${ratingSource(st.expLichess, st.expN)}` : "needs a finished game", st.expN && Math.abs(st.frac - st.exp) > 0.05 ? trend(st.frac - st.exp) : ""),
   ].join("");
 
@@ -1016,7 +976,7 @@ function renderPlayer() {
         <thead><tr><th>Round</th><th>Opponent</th><th class="r">Result</th><th class="num">Rating</th><th class="num">Moves</th><th>Notes</th></tr></thead>
         <tbody>${rowsHTML}</tbody></table></div>` : '<p class="facts">No games yet.</p>'}
     </div>
-    <p class="facts fine">Ratings next to names are Lichess ratings at the start of each game. Performance and expected score use the seed ratings, each player's fixed rating for the tournament, because Lichess ratings change from game to game and can be provisional. Performance is Lichess's tournament performance over finished games: the average of each opponent's rating, plus 500 for a win and minus 500 for a loss.${rated ? " Rating change adds up what Lichess awarded for the finished games in this tournament." : ""}</p>
+    <p class="facts fine">Ratings next to names are Lichess ratings at the start of each game. Performance and expected score use the seed ratings, each player's fixed rating for the tournament, because Lichess ratings change from game to game and can be provisional. Performance is Lichess's tournament performance over finished games: the average of each opponent's rating, plus 500 for a win and minus 500 for a loss.${config.rated ? " Rating change adds up what Lichess awarded for the finished games in this tournament." : ""}</p>
   </div>`;
 }
 
@@ -1106,16 +1066,16 @@ async function refresh(manual) {
     } catch (err) {
       notices.config = `Could not read tournament.json. ${err.message || ""}` +
         (location.protocol === "file:" ? FILE_HINT : "") +
-        (config ? " Showing the last version that loaded." : "");
+        (configText !== null ? " Showing the last version that loaded." : "");
     }
     renderNotice();
-    if (!config) { renderSync("No tournament data"); return; }
-    if (!allIds.length) { renderSync("No games added yet"); return; }
+    if (configText === null) { renderSync("No tournament data"); return; }
+    if (!config.allIds.length) { renderSync("No games added yet"); return; }
     // Show what we already have (cached finished games, earlier fetches) right away.
     if (!state.lastUpdate) { showGames(); renderAll(); }
     if (!manual && Date.now() < state.pausedUntil) return;
     renderSync("Updating…");
-    for (const id of allIds.filter((id) => !finishedCache[id])) {
+    for (const id of config.allIds.filter((id) => !finishedCache[id])) {
       const raw = await fetchGame(id);
       if (!raw) { notFound.add(id); continue; }
       notFound.delete(id);
@@ -1149,7 +1109,7 @@ async function refresh(manual) {
 }
 
 function showGames() {
-  const games = allIds.map((id) => finishedCache[id] || liveGames.get(id)).filter(Boolean);
+  const games = config.allIds.map((id) => finishedCache[id] || liveGames.get(id)).filter(Boolean);
   state.games = new Map(games.map((g) => [g.id, withHistory(summarize(g))]));
 }
 
@@ -1157,7 +1117,7 @@ function showGames() {
 renderAll();
 refresh();
 (function loop() {
-  setTimeout(() => { if (!document.hidden) refresh(); loop(); }, refreshSeconds(config?.refreshSeconds) * 1000);
+  setTimeout(() => { if (!document.hidden) refresh(); loop(); }, config.refreshSeconds * 1000);
 })();
 setInterval(() => {
   tickDeadlines();

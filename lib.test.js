@@ -5,7 +5,7 @@ import {
   START_FEN, DAY_MS, fmtPts, plural, deadlineOf, fmtLeft, extractId, isPrivateId, summarize,
   computeStandings, scheduleMismatch, ratedMismatch, playerGames, playerStats,
   parseTimeControl, gameTimeControl, fmtTimeControl, timeControlMismatch, challengeUrl,
-  parseFormat, endOf, tournamentSpan, fmtSpan, gameDates, subtitleText, refreshSeconds,
+  parseFormat, endOf, tournamentSpan, fmtSpan, gameDates, subtitleText, refreshSeconds, parseConfig,
 } from "./lib.js";
 
 // players: [[username, seed, seedRating]] -> the page's roster map.
@@ -440,4 +440,74 @@ test("refreshSeconds: the default unless it's a number, kept between 20 s and a 
   assert.equal(refreshSeconds(1e7), 86400); // more would overflow setTimeout and fire at once
   // These used to make the page ask Lichess again straight away, without end.
   for (const bad of ["abc", "60", NaN, Infinity, null, {}, [60]]) assert.equal(refreshSeconds(bad), 300);
+});
+
+test("parseConfig: defaults for an empty file", () => {
+  const c = parseConfig({});
+  assert.equal(c.title, "Correspondence round-robin");
+  assert.equal(c.subtitle, null);
+  assert.deepEqual(c.rounds, []);
+  assert.deepEqual(c.allIds, []);
+  assert.equal(c.roster.size, 0);
+  assert.deepEqual(c.scoring, { win: 1, draw: 0.5, loss: 0 });
+  assert.equal(c.rated, true);
+  assert.equal(c.timeControl, null);
+  assert.equal(c.format, "round-robin");
+  assert.equal(c.refreshSeconds, 300);
+  assert.deepEqual(c.warnings, []);
+});
+
+test("parseConfig: settings", () => {
+  const c = parseConfig({
+    title: "T", subtitle: "", rated: false, timeControl: { days: 3 }, scoring: { draw: 1 }, refreshSeconds: 5,
+  });
+  assert.equal(c.title, "T");
+  assert.equal(c.subtitle, ""); // an empty subtitle, not a built one
+  assert.equal(c.rated, false);
+  assert.deepEqual(c.timeControl, { days: 3 });
+  assert.deepEqual(c.scoring, { win: 1, draw: 1, loss: 0 });
+  assert.equal(c.refreshSeconds, 20);
+});
+
+test("parseConfig: players and rounds", () => {
+  const c = parseConfig({
+    players: [
+      { username: "Alice", name: "A", seed: 1, seedRating: 2000, seedBasis: "Blitz" },
+      { username: "bob", seed: "2" },
+      { name: "no username" },
+    ],
+    rounds: [
+      { name: "First", games: [{ white: " Alice ", black: "BOB", id: "https://lichess.org/AbCd1234" }] },
+      { games: [{ white: "bob", black: "alice", id: "" }, { white: "alice", black: "bob", id: "AbCd1234" }] },
+    ],
+  });
+  assert.deepEqual([...c.roster.keys()], ["alice", "bob"]);
+  assert.deepEqual(c.roster.get("alice"), { username: "Alice", name: "A", seed: 1, seedRating: 2000, seedBasis: "Blitz" });
+  assert.deepEqual(c.roster.get("bob"), { username: "bob", name: "", seed: null, seedRating: null, seedBasis: "" });
+  assert.deepEqual(c.rounds.map((r) => r.name), ["First", "Round 2"]);
+  assert.deepEqual(c.rounds[0].slots, [{ white: "alice", black: "bob", raw: "https://lichess.org/AbCd1234", id: "AbCd1234" }]);
+  assert.deepEqual(c.rounds[1].ids, ["AbCd1234"]);
+  assert.deepEqual(c.allIds, ["AbCd1234"]); // once, though it's in two slots
+  assert.deepEqual(c.warnings, []);
+});
+
+test("parseConfig: warnings", () => {
+  const c = parseConfig({
+    players: [{ username: "a" }],
+    rounds: [{ games: [
+      { white: "a", black: "b", id: "AbCd1234WxYz" },
+      { white: "a", black: "", id: "nope" },
+    ] }],
+    timeControl: { days: 4 },
+    format: "swiss",
+  });
+  assert.equal(c.warnings.length, 5);
+  assert.match(c.warnings[0], /not in its players list: b, \(empty\)\./);
+  assert.match(c.warnings[1], /private token: AbCd1234\./);
+  assert.doesNotMatch(c.warnings.join(" "), /WxYz/);
+  assert.match(c.warnings[2], /not valid Lichess game IDs and were skipped: nope\./);
+  assert.match(c.warnings[3], /timeControl/);
+  assert.match(c.warnings[4], /format/);
+  assert.equal(c.timeControl, null);
+  assert.equal(c.format, null);
 });
