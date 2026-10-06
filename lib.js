@@ -17,9 +17,10 @@ export const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 // Correspondence: the player to move has daysPerTurn days from the last move
 // (or the game's creation), as on Lichess. The export has no clock object.
 export const DAY_MS = 86400000;
+const deadline = (g) => g.lastMoveAt + g.daysPerTurn * DAY_MS;
 export function deadlineOf(g) {
   if (g.result || !g.moves.length || !g.daysPerTurn) return null;
-  return g.lastMoveAt + g.daysPerTurn * DAY_MS;
+  return deadline(g);
 }
 // Rounded down, so it never shows more time than there is.
 export function fmtLeft(ms) {
@@ -214,7 +215,7 @@ export function parseFormat(raw) {
 // else ends at its last move, which for a resignation or a draw offer
 // is earlier than the real end.
 export function endOf(g) {
-  if (g.status === "outoftime" && g.daysPerTurn) return g.lastMoveAt + g.daysPerTurn * DAY_MS;
+  if (g.status === "outoftime" && g.daysPerTurn) return deadline(g);
   return g.lastMoveAt;
 }
 
@@ -233,10 +234,11 @@ const ORDINAL = { one: "st", two: "nd", few: "rd", other: "th" };
 const ordinals = new Intl.PluralRules("en", { type: "ordinal" });
 const day = (d) => `${d.getDate()}${ORDINAL[ordinals.select(d.getDate())]}`;
 const month = (d) => d.toLocaleString("en", { month: "long" });
+const full = (d) => `${month(d)} ${day(d)}, ${d.getFullYear()}`;
 
 export function fmtSpan({ start, end }) {
   if (start == null) return "upcoming";
-  const a = new Date(start), full = (d) => `${month(d)} ${day(d)}, ${d.getFullYear()}`;
+  const a = new Date(start);
   if (end == null) return `since ${full(a)}`;
   const b = new Date(end);
   if (a.getFullYear() !== b.getFullYear()) return `${full(a)} – ${full(b)}`;
