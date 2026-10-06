@@ -205,6 +205,7 @@ dialog::backdrop { background: rgba(10, 14, 12, 0.6); }
 .dlg-board { margin: 8px 0; }
 .dlg .controls { display: flex; gap: 6px; margin-top: 12px; justify-content: center; }
 .dlg .controls button { min-width: 48px; font-size: 16px; }
+.dlg .controls svg { display: block; margin: 0 auto; }
 .dlg .keys { margin: 8px 0 0; text-align: center; color: var(--muted); font-size: 12.5px; }
 @media (hover: none) { .dlg .keys { display: none; } }
 .dlg .controls button[aria-disabled="true"] { opacity: 0.4; cursor: default; border-color: var(--line); }
@@ -352,6 +353,9 @@ const state = {
 };
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+// Move buttons are drawn, not typed: arrow characters come from whichever
+// font has them, at different sizes, and some render as emoji.
+const icon = (d) => `<svg viewBox="0 0 16 16" width="1em" height="1em" fill="currentColor" aria-hidden="true"><path d="${d}"/></svg>`;
 const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
 function ago(ts) {
   if (!ts) return "";
@@ -850,10 +854,10 @@ function renderDialog() {
       <div class="dlg-board" id="dlg-board">${boardHTML(cur.fen, cur.last)}</div>
       ${sideHTML(g.white, "white", g)}
       <div class="controls">
-        <button type="button" data-act="first" aria-label="First position">⏮</button>
-        <button type="button" data-act="prev" aria-label="Previous move">◀</button>
-        <button type="button" data-act="next" aria-label="Next move">▶</button>
-        <button type="button" data-act="last" aria-label="Latest position">⏭</button>
+        <button type="button" data-act="first" aria-label="First position">${icon("M2 3h2v10H2zM9 3v10L4 8zM14 3v10L9 8z")}</button>
+        <button type="button" data-act="prev" aria-label="Previous move">${icon("M12 3v10L4 8z")}</button>
+        <button type="button" data-act="next" aria-label="Next move">${icon("M4 3v10l8-5z")}</button>
+        <button type="button" data-act="last" aria-label="Latest position">${icon("M2 3v10l5-5zM7 3v10l5-5zM12 3h2v10h-2z")}</button>
       </div>
       <p class="keys">← → or mouse wheel to step through moves, Home and End for the start and latest position.</p>
     </div>
