@@ -69,10 +69,13 @@ h2 { font-size: 20px; }
 .cross th, .cross td, .pgames th, .pgames td { border-bottom-color: transparent; }
 .pgames tbody tr:hover td { background: var(--self); }
 
-/* Results coloured as in Lichess's Swiss standings. */
-.cross td.res .w { color: var(--live); }
-.cross td.res .d { color: color-mix(in oklab, var(--draw) 70%, var(--surface)); }
-.cross td.res .l { color: color-mix(in oklab, var(--warn) 60%, var(--surface)); font-weight: 600; }
+/* Results coloured as in Lichess's Swiss standings, and rating changes in
+   its green and red. */
+:is(.cross td.res, .pgames td.r, .tile .v) .w, .tile .v.up, .pgames .up { color: var(--live); }
+:is(.cross td.res, .pgames td.r, .tile .v) .d { color: color-mix(in oklab, var(--draw) 70%, var(--surface)); }
+:is(.cross td.res, .pgames td.r, .tile .v) .l, .tile .v.down, .pgames .down {
+  color: color-mix(in oklab, var(--warn) 60%, var(--surface)); font-weight: inherit;
+}
 
 /* Blue for hovered buttons, the selected round and links. */
 button:not([aria-disabled="true"]):hover, .tabs button:hover { color: var(--accent); border-color: var(--accent); }
