@@ -146,6 +146,10 @@ Colours and fonts can be changed with a `theme/theme.css` file next to the
 page, and there's room in the header for a logo. See
 [HACKING.md](HACKING.md#theming) for details.
 
+`themes/lichess` follows the look of [Lichess](https://lichess.org), in
+light and dark. To use it, copy that folder next to the page as `theme/`, or
+try it on the demo with `python3 demo/serve.py --theme themes/lichess`.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
