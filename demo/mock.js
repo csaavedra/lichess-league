@@ -14,6 +14,8 @@
 //               days per move
 //   missing:    true for a game Lichess doesn't know
 //   plies:      how many half-moves to play
+// With ?moves in the page's address, a game in progress gets one more move
+// each time the page fetches it again, as when a player moves on Lichess.
 
 // Every scenario shares this origin, so clear the page's cache of finished
 // games, or one scenario would show another's results for the same ID.
@@ -26,6 +28,8 @@ try {
   const chess = import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dist/esm/chess.js");
   const config = realFetch("tournament.json").then((r) => r.json());
   const HOUR = 3600000, DAY = 24 * HOUR, now = Date.now();
+  const growing = new URLSearchParams(location.search).has("moves");
+  const fetches = new Map(); // id -> times the page fetched the game
 
   // A small seeded generator, so a scenario looks the same on every load.
   function rng(seed) {
@@ -58,9 +62,11 @@ try {
     const finished = !["live", "new"].includes(result);
     const plies = d.plies ?? (result === "new" || result === "aborted" ? 0
       : finished ? 40 + Math.floor(rand() * 50) : 10 + Math.floor(rand() * 40));
+    const extra = growing && result === "live" ? fetches.get(id) ?? 0 : 0;
+    fetches.set(id, extra + 1);
 
     const c = new Chess();
-    for (let i = 0; i < plies && !c.isGameOver(); i++) {
+    for (let i = 0; i < plies + extra && !c.isGameOver(); i++) {
       const moves = c.moves();
       c.move(moves[Math.floor(rand() * moves.length)]);
     }
@@ -84,7 +90,7 @@ try {
     if (clock) clock.totalTime = clock.initial + 40 * clock.increment;
     const daysPerTurn = clock ? undefined : d.daysPerTurn ?? 3;
     const createdAt = now - (cfg.rounds.length + 1 - r) * 10 * DAY;
-    const lastMoveAt = finished ? createdAt + 8 * DAY : plies ? now - (d.hoursAgo ?? rand() * 30) * HOUR : undefined;
+    const lastMoveAt = finished ? createdAt + 8 * DAY : extra ? Date.now() : plies ? now - (d.hoursAgo ?? rand() * 30) * HOUR : undefined;
     return {
       id, rated, status, winner, daysPerTurn, clock, createdAt, lastMoveAt,
       players: { white: side(white, "white"), black: side(black, "black") },

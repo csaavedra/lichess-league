@@ -43,7 +43,8 @@ colours are swapped, whether it's rated, when the last move was made. The
 fields are listed at the top of `demo/mock.js`. `demo/serve.py` adds that
 script to the page, and it answers the page's Lichess requests from those
 fields, with random legal moves. To try a new situation, copy a scenario and
-edit it.
+edit it. Add `?moves` to a scenario's address, as in `/demo/halfway/?moves`,
+and its games in progress get a new move on every refresh.
 
 The demo pages use `theme/` like the real page. To try another theme without
 touching it, pass its folder: `python3 demo/serve.py --theme some/folder`.
