@@ -207,6 +207,7 @@ dialog::backdrop { background: rgba(10, 14, 12, 0.6); }
 .dlg .controls button { min-width: 48px; font-size: 16px; }
 .dlg .keys { margin: 8px 0 0; text-align: center; color: var(--muted); font-size: 12.5px; }
 @media (hover: none) { .dlg .keys { display: none; } }
+.dlg .controls button[aria-disabled="true"] { opacity: 0.4; cursor: default; border-color: var(--line); }
 .moves {
   max-height: min(60vh, 520px); overflow-y: auto; border: 1px solid var(--line); border-radius: var(--radius-sm);
   display: grid; grid-template-columns: 44px 1fr 1fr; align-content: start; font-variant-numeric: tabular-nums;
@@ -865,6 +866,18 @@ function renderDialog() {
   </div>`;
   const curBtn = d.querySelector(".move.cur");
   if (curBtn) curBtn.scrollIntoView({ block: "nearest" });
+  updateControls();
+}
+
+// Buttons that can't move further look disabled. aria-disabled rather than
+// disabled, so a button keeps the keyboard focus when it reaches the end.
+function updateControls() {
+  const o = state.open;
+  const end = o.ply === o.positions.length - 1;
+  for (const b of document.querySelectorAll("#dlg .controls button")) {
+    const off = b.dataset.act === "first" || b.dataset.act === "prev" ? o.ply === 0 : end;
+    b.setAttribute("aria-disabled", off);
+  }
 }
 
 function step(to) {
@@ -880,6 +893,7 @@ function step(to) {
   const btn = d.querySelector(`.move[data-ply="${ply}"]`);
   if (btn) { btn.classList.add("cur"); btn.scrollIntoView({ block: "nearest" }); }
   else { const list = d.querySelector("#moves"); if (list && ply === 0) list.scrollTop = 0; }
+  updateControls();
 }
 
 // ---------- player view ----------
