@@ -51,3 +51,8 @@ override them, and has an empty `.brand` slot in the header for a logo. The
 `theme/` folder is git-ignored. Without it the page uses its default look
 (and logs one 404). The default fonts come from Google Fonts, which the page
 only loads when no theme replaces them.
+
+`themes/` holds sample themes. Besides the variables, they show how to style
+what the variables don't cover: the results in the crosstable (`.w`, `.d`,
+`.l`), the move buttons (faded ones have `aria-disabled="true"`) and
+scrollbars.

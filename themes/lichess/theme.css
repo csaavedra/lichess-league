@@ -1,0 +1,90 @@
+/*
+  The look of Lichess (https://lichess.org, source at
+  https://github.com/lichess-org/lila), in its light and dark modes. Thanks
+  to the Lichess team. To use it, copy this folder next to the page as theme/.
+
+  This theme isn't made or endorsed by Lichess, and uses none of its logos or
+  images: only its colours. Noto Sans is by Google, under the Apache License
+  2.0, and loaded here from Google Fonts.
+*/
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&display=swap");
+
+:root {
+  --page: hsl(37 10% 92%);
+  --page-top: hsl(37 12% 84%);
+  --bg: hsl(37 7% 97%);
+  --surface: hsl(0 0% 100%);
+  --ink: hsl(0 0% 30%);
+  --muted: hsl(0 0% 47%);
+  --line: hsl(0 0% 85%);
+  --self: hsl(37 12% 92%);
+  --zebra: hsl(37 12% 96.5%);
+  --accent: hsl(209 77% 46%);
+  --accent-soft: hsl(209 77% 46% / 0.18);
+  --warn: hsl(0 68% 50%);
+  --warn-soft: hsl(0 68% 50% / 0.1);
+  --live: hsl(88 62% 37%);
+  --draw: hsl(37 74% 48%);
+  --sq-light: #f0d9b5;
+  --sq-dark: #b58863;
+  --last: rgba(155, 199, 0, 0.41);
+  --shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.14), 0 3px 1px -2px rgba(0, 0, 0, 0.2), 0 1px 5px 0 rgba(0, 0, 0, 0.12);
+  --font-display: "Noto Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-text: var(--font-display);
+  --display-weight: 400;
+  --radius: 4px;
+  --radius-sm: 3px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: hsl(37 10% 8%);
+    --page-top: hsl(37 12% 16%);
+    --bg: hsl(37 7% 16%);
+    --surface: hsl(37 7% 14%);
+    --ink: hsl(0 0% 73%);
+    --muted: hsl(0 0% 58%);
+    --line: hsl(0 0% 25%);
+    --self: hsl(37 5% 24%);
+    --zebra: hsl(37 5% 19%);
+    --accent: hsl(209 79% 56%);
+    --accent-soft: hsl(209 79% 56% / 0.25);
+    --warn: hsl(0 60% 58%);
+    --warn-soft: hsl(0 60% 50% / 0.15);
+    --draw: hsl(37 74% 43%);
+  }
+}
+
+/* The background fades in from the top, and content sits in boxes. */
+body { background: var(--page) linear-gradient(to bottom, var(--page-top), var(--page) 116px) no-repeat; }
+.table-scroll, .game, .empty { box-shadow: var(--shadow); }
+.table-scroll, .game { border-color: transparent; }
+.game:hover { border-color: var(--accent); }
+.game.pending:hover { border-color: transparent; }
+h1 { font-weight: 400; }
+h2 { font-size: 20px; }
+
+/* Striped rows instead of lines. */
+.cross tbody tr:nth-child(even) td:not(.self),
+.pgames tbody tr:nth-child(even) td { background: var(--zebra); }
+.cross th, .cross td, .pgames th, .pgames td { border-bottom-color: transparent; }
+.pgames tbody tr:hover td { background: var(--self); }
+
+/* Results coloured as in Lichess's Swiss standings. */
+.cross td.res .w { color: var(--live); }
+.cross td.res .d { color: color-mix(in oklab, var(--draw) 70%, var(--surface)); }
+.cross td.res .l { color: color-mix(in oklab, var(--warn) 60%, var(--surface)); font-weight: 600; }
+
+/* Blue for hovered buttons, the selected round and links. */
+button:not([aria-disabled="true"]):hover, .tabs button:hover { color: var(--accent); border-color: var(--accent); }
+.tabs button[aria-selected="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+.status a, .dlg a { text-decoration: none; }
+.status a:hover, .dlg a:hover { text-decoration: underline; }
+
+/* The game view: thin scrollbars, and the move buttons in one flat strip
+   that turns green on hover. */
+.moves, dialog { scrollbar-width: thin; scrollbar-color: var(--line) var(--surface); }
+.dlg .controls { gap: 0; background: var(--zebra); box-shadow: var(--shadow); }
+.dlg .controls button { flex: 1; height: 2.5rem; border: 0; border-radius: 0; background: transparent; }
+.dlg .controls button:hover:not([aria-disabled="true"]) {
+  background: color-mix(in oklab, var(--live) 75%, var(--surface)); color: #fff;
+}
