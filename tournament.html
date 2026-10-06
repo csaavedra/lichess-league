@@ -73,9 +73,11 @@ header.top {
   display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between;
   gap: 16px; margin-bottom: 28px;
 }
+/* A long title wraps rather than pushing the status onto a row of its own. */
+header.top > div:first-child { flex: 1 1 24rem; min-width: 0; }
 h1 {
   font: 700 clamp(28px, 4.5vw, 44px)/1.05 var(--font-display);
-  margin: 0; letter-spacing: -0.01em; color: var(--heading);
+  margin: 0; letter-spacing: -0.01em; color: var(--heading); text-wrap: balance;
 }
 .brand { display: none; }
 .subtitle { margin: 6px 0 0; color: var(--muted); font-size: 17px; }
