@@ -4,7 +4,7 @@
 // to the demo.
 import { test, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { fetchGame, fetchHistory } from "./lichess.js";
+import { fetchGame, fetchHistory } from "../lichess.js";
 
 const realFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = realFetch; });

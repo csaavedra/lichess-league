@@ -10,9 +10,9 @@ the [README](README.md).
 - `lib.js`: the pure logic (reading tournament.json, standings, tiebreaks,
   player stats, ID parsing, time control, time left, the subtitle), with no
   DOM or network access.
-- `lib.test.js`: its tests.
 - `lichess.js`: the requests to Lichess and the cache of finished games.
-- `lichess.test.js`: tests for the requests, with a fake `fetch`.
+- `test/`: the tests of `lib.js` and `lichess.js`, the latter with a fake
+  `fetch`.
 - `demo/`: made-up tournaments and a mock of the Lichess API.
 
 ## Tests
