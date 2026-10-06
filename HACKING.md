@@ -40,6 +40,9 @@ script to the page, and it answers the page's Lichess requests from those
 fields, with random legal moves. To try a new situation, copy a scenario and
 edit it.
 
+The demo pages use `theme/` like the real page. To try another theme without
+touching it, pass its folder: `python3 demo/serve.py --theme some/folder`.
+
 ## Theming
 
 Colours, fonts and radii are CSS variables in `:root`, with a dark-mode set.
