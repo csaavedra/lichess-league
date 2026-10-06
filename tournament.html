@@ -621,6 +621,8 @@ function renderGames() {
   const st = roundStats(r, state.games);
   meta.textContent = `${st.done} of ${st.total} games finished` + (st.live ? `, ${st.live} in progress` : "") +
     (st.waiting ? `, ${st.waiting} not started yet` : "");
+  // The position each card showed, to slide in the moves made since.
+  const shown = new Map([...el.querySelectorAll(".game[data-id]")].map((c) => [c.dataset.id, c.dataset.fen]));
   el.innerHTML = r.slots.map((slot) => {
     const g = slot.id && state.games.get(slot.id);
     if (!g) {
@@ -636,7 +638,7 @@ function renderGames() {
       </div>`;
     }
     const mismatch = mismatchText(slot, g);
-    return `<div class="game" role="button" tabindex="0" data-id="${esc(g.id)}" aria-label="${esc(displayName(g.white))} against ${esc(displayName(g.black))}, open game">
+    return `<div class="game" role="button" tabindex="0" data-id="${esc(g.id)}" data-fen="${esc(g.fen)}" aria-label="${esc(displayName(g.white))} against ${esc(displayName(g.black))}, open game">
       ${sideHTML(g.black, "black", g)}
       ${boardHTML(g.fen, g.last)}
       ${sideHTML(g.white, "white", g)}
@@ -644,6 +646,9 @@ function renderGames() {
       ${mismatch ? `<div class="status warn">${esc(mismatch)}</div>` : ""}
     </div>`;
   }).join("");
+  for (const c of el.querySelectorAll(".game[data-id]")) {
+    slidePieces(c.querySelector(".board"), shown.get(c.dataset.id), c.dataset.fen);
+  }
 }
 
 // A message replaces "Updated …" and stays until the next renderSync().
@@ -717,6 +722,7 @@ function renderDialog() {
   const { id } = state.open;
   const g = state.games.get(id);
   if (!g) return;
+  const prev = state.open.positions[state.open.ply]; // to slide in a new move
   // Keep up with new moves if the viewer was on the latest one.
   const fresh = buildPositions(g);
   if (fresh.length !== state.open.positions.length) {
@@ -770,6 +776,7 @@ function renderDialog() {
       <a href="https://lichess.org/${esc(g.id)}" target="_blank" rel="noopener">Open on Lichess</a>
     </div>
   </div>`;
+  slidePieces(d.querySelector("#dlg-board"), prev?.fen, cur.fen);
   showMove(d.querySelector(".move.cur"));
   updateControls();
 }
@@ -810,7 +817,7 @@ function step(to) {
   const cur = o.positions[ply];
   const board = d.querySelector("#dlg-board");
   board.innerHTML = boardHTML(cur.fen, cur.last);
-  slidePieces(board, pieceMoves(prev.fen, cur.fen));
+  slidePieces(board, prev.fen, cur.fen);
   d.querySelectorAll(".move.cur").forEach((b) => b.classList.remove("cur"));
   const btn = d.querySelector(`.move[data-ply="${ply}"]`);
   if (btn) { btn.classList.add("cur"); showMove(btn); }
@@ -818,11 +825,12 @@ function step(to) {
   updateControls();
 }
 
-// Slides the pieces from the squares they left, as pieceMoves() pairs them.
-function slidePieces(board, moves) {
-  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+// Slides the pieces of a board just drawn at toFen from the squares they had at
+// fromFen, if there was a previous position.
+function slidePieces(board, fromFen, toFen) {
+  if (!fromFen || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   const squares = board.querySelectorAll(".sq");
-  for (const [from, to] of moves) {
+  for (const [from, to] of pieceMoves(fromFen, toFen)) {
     // The image fills its square, so a percentage moves it by whole squares.
     const t = `translate(${((from % 8) - (to % 8)) * 100}%, ${((from >> 3) - (to >> 3)) * 100}%)`;
     // z-index keeps it above the squares that come later in the grid.
