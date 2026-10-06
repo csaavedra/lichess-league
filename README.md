@@ -5,88 +5,80 @@ players set up themselves: correspondence games, or a slow league where
 opponents agree when to play each round. This page follows such a tournament
 from a list of Lichess game IDs.
 
-It's a single static page: a crosstable with tiebreaks, each round's games
-with live boards, a move-by-move game view, and each player's performance.
-Game data comes straight from the Lichess API, refreshed every few minutes.
-There is no server, no build step and no account. For now it handles
-round-robin tournaments.
+It's a single page that you put on any static host. There is no server, no
+database and no account to create. For now it handles round-robin
+tournaments.
 
-There is no engine or evaluation anywhere on the page, by design: it's meant
-for games still in progress.
+## What the page shows
 
-## Running it
+- A crosstable with points, tiebreaks and games played. A green dot marks a
+  game in progress.
+- Each round's games, with a board per game, the result or whose move it
+  is, and the time left to move, highlighted when it's under a day.
+- A move-by-move view of each game.
+- Each player's tournament: their games, performance, score against
+  expectation and, in a rated tournament, the rating they gained or lost.
+- For each game not started yet, a link for White to send the challenge.
 
-The page reads `tournament.json` next to it, so it has to be served over
-HTTP (browsers block reading it from `file://`):
+Game data comes from Lichess and the page refreshes it every few minutes,
+so it can stay open on a screen.
 
-    cp tournament.example.json tournament.json
-    python3 -m http.server --bind localhost 8000
+There is no engine or evaluation anywhere on the page, on purpose: games
+may still be in progress.
 
-Then open http://localhost:8000/tournament.html.
+Players can also create their challenges by hand, and mistakes happen, so
+the page checks every game against the schedule and warns when:
 
-To publish it, copy `tournament.html` (or rename it `index.html`), `lib.js`
-and `tournament.json` to any static host.
+- the colours are reversed, or the players aren't the scheduled ones;
+- the game is unrated in a rated tournament, or the other way round;
+- the time control isn't the tournament's;
+- a game ID is wrong, or includes a player's private token (see below);
+- a player in the schedule is missing from the player list.
 
-### Trying it without real games
+## Running a tournament
 
-`demo/` has made-up tournaments, to see how the page looks in situations
-that are hard to set up on Lichess:
+1. Decide the players and the pairings. The page doesn't make pairings:
+   you bring the schedule. For a round-robin, the standard Berger tables
+   are a good choice, and sites like Challonge can generate them.
+2. Write them in `tournament.json`, starting from `tournament.example.json`
+   (described below).
+3. Put the page online (see [Publishing](#publishing)) and share the link
+   with the players.
+4. When a round starts, White sends the challenge from the link next to
+   their game. It comes with the right opponent, colours, time control and
+   rating already set.
+5. Once a game starts, add its ID to `tournament.json`. From then on the
+   page follows the game on its own, until it's over.
 
-    python3 demo/serve.py
+The page re-reads `tournament.json` on every refresh, so editing that file
+is all it takes to keep the tournament up to date.
 
-Then open http://localhost:8000/demo/ and pick one:
-
-- `halfway`: finished, live and upcoming rounds.
-- `finished`: every game played, with ties in the standings.
-- `problems`: one game for each warning the page shows (reversed colours,
-  wrong players, unrated game, wrong time control, unknown ID, private
-  token, little time left, and more).
-- `unrated`: an unrated tournament with two rated games.
-
-Each scenario is a tournament file, `demo/NAME.json`, whose games have an
-extra `demo` field describing the game to fake: its result, whether the
-colours are swapped, whether it's rated, when the last move was made. The
-fields are listed at the top of `demo/mock.js`. The server adds that
-script to the page, and it answers the page's Lichess requests from those
-fields, with random legal moves. Nothing is sent to Lichess. To try a new
-situation, copy a scenario and edit it.
+> **Only ever paste the first 8 characters of a game ID.** A player who
+> copies the link from their own game gets a 12-character URL; the last 4
+> characters are a private token that lets anyone move for them. The page
+> warns about such IDs.
 
 ## The tournament file
 
-`tournament.json` holds everything about the tournament. The page re-reads it
-on every refresh, so editing it is how you update the tournament.
+`tournament.json` holds everything about the tournament:
 
 - `title`, `subtitle`: shown in the header.
 - `players`: each player's Lichess `username`, display `name`, `seed`, and a
   `seedRating` (with `seedBasis`, the rating it came from). Seed ratings are
   used for expected score and performance.
 - `rounds`: each round has a `name` and its `games`, as
-  `{ "white": username, "black": username, "id": "" }`.
+  `{ "white": username, "black": username, "id": "" }`. Leave `id` empty
+  until the game exists; then put in its 8-character ID, or its link, like
+  `https://lichess.org/AbCd1234`.
 - `rated`: whether the games should be rated on Lichess (default `true`).
-  The page flags a game that isn't set up that way.
 - `timeControl`: the time control the games should have, either
   `{ "days": 3 }` (days per move) or `{ "minutes": 90, "increment": 30 }`
   (a clock, with the increment in seconds). It has to be one Lichess's
   challenge form offers: 1, 2, 3, 5, 7, 10 or 14 days, or one of its
-  clocks. The page flags a game with a different one. Without it, any time
-  control is accepted.
+  clocks. Without it, any time control is accepted, and players pick one
+  when they send the challenge.
 - `scoring`: points for a win, draw and loss (default 1, ½, 0).
-- `refreshSeconds`: how often to poll Lichess (default 300).
-
-Each game not on Lichess yet has a link for White to send the challenge.
-It opens Lichess's "challenge a friend" form with Black as the opponent,
-White's colour, and the tournament's `rated` and `timeControl` already
-chosen. Lichess won't send the challenge if any of them is changed.
-
-Once a game starts on Lichess, put its 8-character ID (or its link, like
-`https://lichess.org/AbCd1234`) in `id`. The page flags a game whose players
-or colours don't match the schedule, or that isn't rated or timed as
-`rated` and `timeControl` say.
-
-> **Only ever paste the first 8 characters.** A player who copies the link
-> from their own game gets a 12-character URL; the last 4 characters are a
-> private token that lets anyone move for them. The page warns about such
-> IDs.
+- `refreshSeconds`: how often to check Lichess for updates (default 300).
 
 ## Standings
 
@@ -97,37 +89,58 @@ Ties on points are broken, in order, by:
 3. Total wins
 4. Seed
 
-Performance uses the Lichess Swiss formula: the average of each opponent's
-rating, +500 for a win and −500 for a loss.
+Performance uses Lichess's tournament formula: the average of each
+opponent's seed rating, +500 for a win and −500 for a loss. Seed ratings
+are used instead of current Lichess ratings because those change from game
+to game.
 
-## How it talks to Lichess
+## For players
 
-- Games are fetched one at a time from `/game/export/{id}`. On a 429 the page
-  backs off for two minutes.
-- Lichess leaves the last few moves out of the export while a game is in
-  progress, so the page reads the full move list from the game stream when a
-  position changes.
-- Finished games are cached in `localStorage` and never fetched again.
-- [chess.js](https://github.com/jhlywa/chess.js) is loaded from jsDelivr only
-  to replay moves. If it fails to load, the standings and boards still work.
+- Your games are listed by round. When it's your turn to play White, use the
+  link next to your game to send the challenge. Don't change anything on
+  the form: Lichess won't send it if the time control, rating or colour
+  is changed.
+- If you play Black, wait for your opponent's challenge.
+- When you send your game to the organizer, send only the first 8
+  characters of its ID. The link you see while playing has 4 more that let
+  anyone move for you.
 
-## Theming
+## Publishing
 
-Colours, fonts and radii are CSS variables in `:root`, with a dark-mode set.
-The page loads an optional `theme/theme.css` after its own styles to
-override them, and has an empty `.brand` slot in the header for a logo. The
-`theme/` folder is git-ignored. Without it the page uses its default look
-(and logs one 404). The default fonts come from Google Fonts, which the page
-only loads when no theme replaces them.
+The page reads `tournament.json` next to it, so it has to be served over
+HTTP; opening the file directly won't work. To try it on your computer:
 
-## Development
+    cp tournament.example.json tournament.json
+    python3 -m http.server --bind localhost 8000
 
-The pure logic (standings, tiebreaks, player stats, ID parsing, time
-control, time left) lives in `lib.js`, with no DOM or network access. Its
-tests need nothing beyond Node 22 or later (`package.json` only marks the
-files as ES modules; there is nothing to install):
+Then open http://localhost:8000/tournament.html.
 
-    node --test
+To put it online, copy `tournament.html` (renamed to `index.html` if you
+like), `lib.js` and `tournament.json` to any static host. On GitHub Pages,
+put those three files in a repository and turn on Pages in its settings.
+After that, updating the tournament means editing `tournament.json` there.
+
+## Trying it without real games
+
+`demo/` has made-up tournaments, to see how the page looks before you have
+real games:
+
+    python3 demo/serve.py
+
+Then open http://localhost:8000/demo/ and pick one:
+
+- `halfway`: finished, live and upcoming rounds.
+- `finished`: every game played, with ties in the standings.
+- `problems`: one game for each warning the page shows.
+- `unrated`: an unrated tournament with two rated games.
+
+Nothing is sent to Lichess.
+
+## Changing the look
+
+Colours and fonts can be changed with a `theme/theme.css` file next to the
+page, and there's room in the header for a logo. See
+[HACKING.md](HACKING.md#theming) for details.
 
 ## License
 
