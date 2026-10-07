@@ -299,22 +299,11 @@ footer a { color: inherit; text-underline-offset: 2px; }
 }
 @keyframes pulse { from { transform: scale(1); opacity: 0.7; } to { transform: scale(2.8); opacity: 0; } }
 </style>
+<!-- The default fonts, copied in vendor/. Browsers only download the ones the
+     page uses, so none when a theme replaces them. -->
+<link rel="stylesheet" href="vendor/fonts/fonts.css">
 <!-- Optional site theme: overrides the variables above. Not part of this repository. -->
 <link rel="stylesheet" href="theme/theme.css">
-<script>
-  // Load the default fonts from Google only if the page still uses them, so a
-  // theme with its own fonts keeps visitors' addresses away from Google. The
-  // browser runs this once the theme above has loaded, or failed to.
-  {
-    const root = getComputedStyle(document.documentElement);
-    if (/Figtree|Spectral/.test(root.getPropertyValue("--font-display") + root.getPropertyValue("--font-text"))) {
-      const link = document.createElement("link");
-      link.rel = "stylesheet";
-      link.href = "https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Spectral:wght@500;600;700&display=swap";
-      document.head.append(link);
-    }
-  }
-</script>
 </head>
 <body>
 <div class="wrap">

@@ -71,16 +71,29 @@ folder next to `lib.js`, add it to `PAGE_FILES` in `demo/serve.py`.
 ## Copied files
 
 `vendor/` has copies of what the page uses from other projects, so that it
-doesn't depend on other servers for them: chess.js, from its npm package,
-checked against the hash the npm registry gives for it. Its license is next to
-it. `tools/vendor.py` makes the folder and says which version it takes; don't
-edit `vendor/` by hand.
+doesn't depend on other servers for them, and visitors' addresses don't reach
+them:
+
+- chess.js, from its npm package, checked against the hash the npm registry
+  gives for it.
+- The default fonts, Figtree and Spectral, as Google Fonts serves them to
+  browsers: one file per alphabet (and per weight for Spectral), with
+  `fonts/fonts.css` to load them.
+
+Each has its license next to it. `tools/vendor.py` makes the folder and says
+which version of chess.js it takes; don't edit `vendor/` by hand.
 
 These copies don't update themselves, so check for updates now and then, for
-example before a new tournament. chess.js lists its releases at
-https://github.com/jhlywa/chess.js/releases. To update, change the version in
-`tools/vendor.py`, run `python3 tools/vendor.py`, check that games can still
-be stepped through on the page and in the demo, and commit `vendor/`.
+example before a new tournament:
+
+- chess.js lists its releases at https://github.com/jhlywa/chess.js/releases.
+  To update, change the version in `tools/vendor.py`.
+- Google Fonts has no versions to choose, and updates its fonts now and then.
+  Running the script again takes whatever it serves now, and `git diff --stat`
+  shows whether anything changed.
+
+Then run `python3 tools/vendor.py`, check the page and the demo (the fonts,
+and that games can still be stepped through), and commit `vendor/`.
 
 ## Theming
 
@@ -88,8 +101,8 @@ Colours, fonts and radii are CSS variables in `:root`, with a dark-mode set.
 The page loads an optional `theme/theme.css` after its own styles to
 override them, and has an empty `.brand` slot in the header for a logo. The
 `theme/` folder is git-ignored. Without it the page uses its default look
-(and logs one 404). The default fonts come from Google Fonts, which the page
-only loads when no theme replaces them.
+(and logs one 404). The default fonts are copied in `vendor/fonts/`, and
+browsers only download them when no theme replaces them.
 
 `themes/` holds sample themes. Besides the variables, they show how to style
 what the variables don't cover: the results in the crosstable (`.w`, `.d`,
