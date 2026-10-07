@@ -1,6 +1,6 @@
 {
   "title": "Demo: finished",
-  "demo": "Every game played, with ties in the standings.",
+  "demo": { "about": "Every game played, with ties in the standings, in a sample theme inspired by Lichess.", "theme": "lichess" },
 
   "players": [
     { "username": "player1", "name": "Alice", "seed": 1, "seedRating": 2000, "seedBasis": "Correspondence" },
