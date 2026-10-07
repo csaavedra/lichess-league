@@ -17,6 +17,8 @@ the [README](README.md).
   `fetch` and a fake `localStorage`, and a check that the demo's stand-in
   for `lichess.js` has the same exports.
 - `demo/`: made-up tournaments and a stand-in for `lichess.js`.
+- `vendor/`: copies of what the page uses from other projects (see
+  [Copied files](#copied-files)), made by `tools/vendor.py`.
 
 ## Tests
 
@@ -35,8 +37,9 @@ The requests are in `lichess.js`, which also sets up the cache.
   progress, so the page reads the full move list from the game stream when a
   position changes.
 - Finished games are cached in `localStorage` and never fetched again.
-- [chess.js](https://github.com/jhlywa/chess.js) is loaded from jsDelivr only
-  to replay moves. If it fails to load, the standings and boards still work.
+- [chess.js](https://github.com/jhlywa/chess.js), copied in `vendor/`, is
+  loaded only to replay moves. If it fails to load, the standings and boards
+  still work.
 
 ## The demo
 
@@ -62,8 +65,22 @@ all of them without touching it, pass its folder:
 `python3 demo/serve.py --out DIR` writes the same pages to a folder instead,
 for a static host. That copy never takes `theme/`, only the scenarios' own
 themes or `--theme`, so a theme in `theme/` isn't published by mistake. The
-server and `--out` share one list of files: when the page gets a new file next
-to `lib.js`, add it to `PAGE_FILES` in `demo/serve.py`.
+server and `--out` share one list of files: when the page gets a new file or
+folder next to `lib.js`, add it to `PAGE_FILES` in `demo/serve.py`.
+
+## Copied files
+
+`vendor/` has copies of what the page uses from other projects, so that it
+doesn't depend on other servers for them: chess.js, from its npm package,
+checked against the hash the npm registry gives for it. Its license is next to
+it. `tools/vendor.py` makes the folder and says which version it takes; don't
+edit `vendor/` by hand.
+
+These copies don't update themselves, so check for updates now and then, for
+example before a new tournament. chess.js lists its releases at
+https://github.com/jhlywa/chess.js/releases. To update, change the version in
+`tools/vendor.py`, run `python3 tools/vendor.py`, check that games can still
+be stepped through on the page and in the demo, and commit `vendor/`.
 
 ## Theming
 

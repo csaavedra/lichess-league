@@ -30,7 +30,7 @@ const load = () => (setup ??= (async () => {
   const cfg = await (await fetch("tournament.json")).json();
   return {
     cfg, parsed: parseConfig(cfg),
-    Chess: (await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dist/esm/chess.js")).Chess,
+    Chess: (await import("./vendor/chess.js")).Chess,
     growing: new URLSearchParams(location.search).has("moves"),
   };
 })());
