@@ -6,17 +6,19 @@
 
 Then open http://localhost:8000/demo/. Each scenario NAME.json in this folder
 is a tournament file served at /demo/NAME/, with demo/mock.js as the page's
-lichess.js, which makes up the games from the "demo" field of each game. The
-pages use the theme in theme/, or the one in DIR with --theme.
+lichess.js, which makes up the games from the "demo" field of each game. A
+scenario that names a sample theme in its own "demo" field uses that one,
+from themes/; the others use the theme in theme/. --theme DIR replaces both.
 
 With --out, it writes the same pages to the folder DIR instead, to put on a
-static host. That copy has no theme unless --theme is given, so that a theme
-kept in theme/ isn't published by mistake.
+static host. That copy never takes theme/, only the scenarios' own themes or
+--theme, so that a theme kept in theme/ isn't published by mistake.
 """
-import argparse, html, http.server, json, mimetypes, pathlib, urllib.parse
+import argparse, html, http.server, json, mimetypes, pathlib, re, urllib.parse
 
 DEMO = pathlib.Path(__file__).resolve().parent
 ROOT = DEMO.parent
+THEMES = ROOT / "themes"
 # The page's own files besides tournament.html, lichess.js and the theme.
 PAGE_FILES = ["lib.js"]
 
@@ -25,9 +27,20 @@ def scenarios():
     return sorted(DEMO.glob("*.json"))
 
 
+# A scenario's own "demo" field: "about", its line on the index page, and
+# optionally "theme", the name of a sample theme in themes/.
+def about(p):
+    return json.loads(p.read_text()).get("demo") or {}
+
+
+def theme_files(theme):
+    return sorted(f for f in theme.rglob("*") if f.is_file()
+                  and not any(part.startswith(".") for part in f.relative_to(theme).parts))
+
+
 def index():
     items = "".join(
-        f'<li><a href="{p.stem}/">{p.stem}</a>: {html.escape(json.loads(p.read_text()).get("demo", ""))}</li>'
+        f'<li><a href="{p.stem}/">{p.stem}</a>: {html.escape(about(p).get("about", ""))}</li>'
         for p in scenarios())
     return f"""<!doctype html>
 <html lang="en">
@@ -61,20 +74,23 @@ ROOT_INDEX = b"""<!doctype html>
 """
 
 
-def site(theme):
-    """Every file of the demo, as {path: bytes or the file to copy}."""
+def site(theme, fallback):
+    """Every file of the demo, as {path: bytes or the file to copy}. theme,
+    if given, replaces each scenario's own; fallback is for those without one."""
     files = {"index.html": ROOT_INDEX, "demo/index.html": index()}
-    themed = sorted(f for f in theme.rglob("*") if f.is_file()
-                    and not any(part.startswith(".") for part in f.relative_to(theme).parts)) if theme else []
     for p in scenarios():
         d = f"demo/{p.stem}/"
+        own = about(p).get("theme")
+        if own and not (re.fullmatch(r"[\w-]+", own) and (THEMES / own).is_dir()):
+            raise ValueError(f"{p.name} asks for the theme {own!r}, which isn't a folder in themes/")
+        use = theme or (THEMES / own if own else fallback)
         files[d + "index.html"] = ROOT / "tournament.html"
         files[d + "tournament.json"] = p
         files[d + "lichess.js"] = DEMO / "mock.js"
         for name in PAGE_FILES:
             files[d + name] = ROOT / name
-        for f in themed:
-            files[d + "theme/" + f.relative_to(theme).as_posix()] = f
+        for f in theme_files(use) if use else []:
+            files[d + "theme/" + f.relative_to(use).as_posix()] = f
     return files
 
 
@@ -86,7 +102,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         url = urllib.parse.urlsplit(self.path)
         path = urllib.parse.unquote(url.path).lstrip("/")
-        files = site(THEME)
+        try:
+            files = site(THEME, FALLBACK)
+        except ValueError as err:
+            return self.send_error(500, str(err))
         key = path + "index.html" if path == "" or path.endswith("/") else path
         if key not in files:
             if path + "/index.html" in files:
@@ -113,16 +132,22 @@ args = parser.parse_args()
 if args.theme and not args.theme.is_dir():
     parser.error(f"{args.theme} is not a folder")
 
+THEME = args.theme.resolve() if args.theme else None
+FALLBACK = None if args.out or not (ROOT / "theme").is_dir() else ROOT / "theme"
+try:
+    files = site(THEME, FALLBACK)
+except ValueError as err:
+    parser.error(str(err))
+
 if args.out:
     if args.out.exists() and (not args.out.is_dir() or any(args.out.iterdir())):
         parser.error(f"{args.out} has to be a new or empty folder")
-    for path, src in site(args.theme.resolve() if args.theme else None).items():
+    for path, src in files.items():
         dest = args.out / path
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(read(src))
     print(f"Wrote the demo to {args.out}/")
 else:
-    THEME = args.theme.resolve() if args.theme else (ROOT / "theme" if (ROOT / "theme").is_dir() else None)
     print(f"Demo scenarios at http://localhost:{args.port}/demo/")
     # Local only: with no --theme, it serves theme/, which may not be meant to be public.
     http.server.ThreadingHTTPServer(("localhost", args.port), Handler).serve_forever()

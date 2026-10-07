@@ -51,16 +51,19 @@ When `lichess.js` gets a new export, the mock needs it too; `node --test`
 checks. To try a new situation, copy a scenario and edit it. Add `?moves` to
 a scenario's address, as in `/demo/halfway/?moves`, and its games in
 progress get a new move on every refresh. A scenario's own `demo` field, at
-the top of the file, is the line that describes it on the demo's index page.
+the top of the file, has `about`, the line that describes it on the demo's
+index page, and can name a sample theme in `themes/` for it with `theme`, as
+`finished` does with `"theme": "lichess"`.
 
-The demo pages use `theme/` like the real page. To try another theme without
-touching it, pass its folder: `python3 demo/serve.py --theme some/folder`.
+The other demo pages use `theme/` like the real page. To try another theme on
+all of them without touching it, pass its folder:
+`python3 demo/serve.py --theme some/folder`.
 
 `python3 demo/serve.py --out DIR` writes the same pages to a folder instead,
-for a static host. That copy has no theme unless `--theme` is given, so a
-theme in `theme/` isn't published by mistake. The server and `--out` share
-one list of files: when the page gets a new file next to `lib.js`, add it to
-`PAGE_FILES` in `demo/serve.py`.
+for a static host. That copy never takes `theme/`, only the scenarios' own
+themes or `--theme`, so a theme in `theme/` isn't published by mistake. The
+server and `--out` share one list of files: when the page gets a new file next
+to `lib.js`, add it to `PAGE_FILES` in `demo/serve.py`.
 
 ## Theming
 
