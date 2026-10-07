@@ -174,6 +174,8 @@ The page loads, without bundling them:
 - [chess.js](https://github.com/jhlywa/chess.js) by Jeff Hlywa, BSD-2-Clause,
   from jsDelivr.
 - The cburnett pieces by Colin M.L. Burnett, GPLv2+, from Lichess.
+- The chess font that draws the pieces in the moves, by the pgn4web authors,
+  GPLv2+, from Lichess.
 - The Figtree and Spectral fonts, SIL Open Font License, from Google Fonts.
 
 This project is not affiliated with Lichess. Game data comes from the
