@@ -1,4 +1,5 @@
 // Pure logic for tournament.html: no DOM, no network, no module state.
+// The only storage it touches is the one passed to gameCache().
 // Tested by test/lib.test.js (node --test).
 
 export const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -77,6 +78,26 @@ export function summarize(g) {
     // Seconds in the export; minutes here, as in tournament.json.
     clock: g.clock ? { minutes: g.clock.initial / 60, increment: g.clock.increment } : null,
     rated: !!g.rated,
+  };
+}
+
+// Finished games never change, so the page keeps them and only asks for
+// games still in progress (or not seen yet). With a storage, like
+// localStorage, and a key, they are kept there between visits too; without,
+// only in memory. Returns { finishedGame, cacheFinished }.
+export function gameCache(storage, key) {
+  let games = {};
+  if (storage) try { games = JSON.parse(storage.getItem(key)) || {}; } catch { /* unreadable */ }
+  return {
+    // The export of a finished game seen before, or undefined.
+    finishedGame: (id) => games[id],
+    // Keeps an export, with only the fields summarize() reads, if its game is over.
+    cacheFinished(g) {
+      if (ONGOING.has(g.status)) return;
+      const { id, rated, status, winner, players, moves, lastFen, lastMove, lastMoveAt, createdAt, opening, daysPerTurn, clock } = g;
+      games[id] = { id, rated, status, winner, players, moves, lastFen, lastMove, lastMoveAt, createdAt, opening, daysPerTurn, clock };
+      if (storage) try { storage.setItem(key, JSON.stringify(games)); } catch { /* storage full or blocked */ }
+    },
   };
 }
 
