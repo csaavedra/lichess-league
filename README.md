@@ -169,16 +169,16 @@ to the page as `theme/`, or try it on all the demos with
 
 MIT. See [LICENSE](LICENSE).
 
-The page comes with a copy of, in `vendor/` with its license:
+The page comes with copies of these, in `vendor/` with their licenses:
 
 - [chess.js](https://github.com/jhlywa/chess.js) by Jeff Hlywa, BSD-2-Clause.
+- The Figtree and Spectral fonts, SIL Open Font License.
 
 And it loads, without bundling them:
 
 - The cburnett pieces by Colin M.L. Burnett, GPLv2+, from Lichess.
 - The chess font that draws the pieces in the moves, by the pgn4web authors,
   GPLv2+, from Lichess.
-- The Figtree and Spectral fonts, SIL Open Font License, from Google Fonts.
 
 This project is not affiliated with Lichess. Game data comes from the
 [Lichess API](https://lichess.org/api).

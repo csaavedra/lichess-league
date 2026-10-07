@@ -5,20 +5,29 @@
 
 - vendor/chess.js: chess.js, from its npm package, checked against the
   hash the npm registry gives for it, with its license next to it.
+- vendor/fonts/: the page's default fonts, Figtree and Spectral, as Google
+  Fonts serves them to browsers, with fonts.css to load them and each
+  font's license in its folder.
 
 To update, change the version below, run this, check the page and the demo,
-and commit vendor/. Don't edit vendor/ by hand: this script replaces it.
+and commit vendor/. Google Fonts has no versions to choose: running this
+again takes whatever it serves now. Don't edit vendor/ by hand: this script
+replaces it.
 """
-import base64, hashlib, io, json, pathlib, shutil, tarfile, urllib.request
+import base64, hashlib, io, json, pathlib, re, shutil, tarfile, urllib.request
 
 CHESS_JS = "1.4.0"
+FONTS = "https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Spectral:wght@500;600;700&display=swap"
+# Google Fonts picks the font format from the browser; this one gets woff2.
+BROWSER = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36"
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 VENDOR = ROOT / "vendor"
 
 
-def get(url):
-    with urllib.request.urlopen(url, timeout=30) as res:
+def get(url, agent=None):
+    req = urllib.request.Request(url, headers={"User-Agent": agent} if agent else {})
+    with urllib.request.urlopen(req, timeout=30) as res:
         return res.read()
 
 
@@ -33,7 +42,45 @@ def chess_js(out):
             (out / dest).write_bytes(tar.extractfile(name).read())
 
 
+def fonts(out):
+    css = get(FONTS, BROWSER).decode()
+    # Each rule is one font file for one alphabet ("latin", "cyrillic", ...),
+    # which the browser only downloads for text that needs it.
+    rules = []
+    for subset, rule in re.findall(r"/\* ([\w-]+) \*/\s*(@font-face \{.*?\})", css, re.S):
+        family = re.search(r"font-family: '([^']+)'", rule)[1]
+        weight = re.search(r"font-weight: (\d+)", rule)[1]
+        url = re.search(r"url\((https://fonts\.gstatic\.com/[^)]+\.woff2)\)", rule)[1]
+        rules.append((subset, rule, family, weight, url))
+    if not rules:
+        raise SystemExit("Google Fonts sent no fonts.")
+    # A variable font serves all its weights from one file.
+    weights = {}
+    for _, _, _, weight, url in rules:
+        weights.setdefault(url, set()).add(weight)
+    names, out_rules = {}, []
+    for subset, rule, family, weight, url in rules:
+        if url not in names:
+            name = f"{family.lower()}/" + (subset if len(weights[url]) > 1 else f"{weight}-{subset}") + ".woff2"
+            data = get(url)
+            if not data.startswith(b"wOF2"):
+                raise SystemExit(f"{url} isn't a woff2 font.")
+            (out / name).parent.mkdir(parents=True, exist_ok=True)
+            (out / name).write_bytes(data)
+            names[url] = name
+        out_rules.append(f"/* {family} {weight}, {subset} */\n" + rule.replace(url, names[url]))
+    for family in sorted({r[2] for r in rules}):
+        (out / family.lower() / "OFL.txt").write_bytes(
+            get(f"https://raw.githubusercontent.com/google/fonts/main/ofl/{family.lower()}/OFL.txt"))
+    (out / "fonts.css").write_text(
+        "/* The page's default fonts, as Google Fonts serves them. Each font's license\n"
+        "   is in its folder. Made by tools/vendor.py: don't edit by hand. */\n\n"
+        + "\n\n".join(out_rules) + "\n")
+
+
 shutil.rmtree(VENDOR, ignore_errors=True)
 VENDOR.mkdir()
 chess_js(VENDOR)
-print(f"Wrote chess.js {CHESS_JS} to {VENDOR.relative_to(ROOT)}/")
+(VENDOR / "fonts").mkdir()
+fonts(VENDOR / "fonts")
+print(f"Wrote chess.js {CHESS_JS} and the fonts to {VENDOR.relative_to(ROOT)}/")
