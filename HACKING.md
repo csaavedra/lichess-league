@@ -9,8 +9,10 @@ the [README](README.md).
   `<script type="module">`. There is no build step.
 - `lib.js`: the pure logic (reading tournament.json, standings, tiebreaks,
   player stats, ID parsing, time control, time left, the subtitle, which
-  pieces moved between two positions), with no DOM or network access.
-- `lichess.js`: the requests to Lichess and the cache of finished games.
+  pieces moved between two positions, the cache of finished games), with no
+  DOM or network access.
+- `lichess.js`: the requests to Lichess, and the cache of finished games
+  kept in `localStorage`.
 - `test/`: the tests of `lib.js` and `lichess.js`, the latter with a fake
   `fetch` and a fake `localStorage`.
 - `demo/`: made-up tournaments and a mock of the Lichess API.
@@ -24,7 +26,7 @@ the files as ES modules; there is nothing to install):
 
 ## How it talks to Lichess
 
-The requests and the cache are in `lichess.js`.
+The requests are in `lichess.js`, which also sets up the cache.
 
 - Games are fetched one at a time from `/game/export/{id}`. On a 429 the page
   backs off for two minutes.

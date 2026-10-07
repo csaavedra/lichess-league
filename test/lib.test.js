@@ -6,7 +6,7 @@ import {
   computeStandings, scheduleMismatch, ratedMismatch, playerGames, playerStats,
   parseTimeControl, gameTimeControl, fmtTimeControl, timeControlMismatch, challengeUrl,
   parseFormat, endOf, tournamentSpan, fmtSpan, gameDates, subtitleText, refreshSeconds, parseConfig,
-  scoreOf, ordinal, roundStats, roundState, currentRound, boardSquares, pieceMoves,
+  scoreOf, ordinal, roundStats, roundState, currentRound, boardSquares, pieceMoves, gameCache,
 } from "../lib.js";
 
 // players: [[username, seed, seedRating]] -> the page's roster map.
@@ -568,4 +568,17 @@ test("pieceMoves: a promoted piece comes from the pawn, not back", () => {
   const before = "1n2k3/P7/8/8/8/8/8/4K3 w - - 0 1", after = "1Q2k3/8/8/8/8/8/8/4K3 b - - 0 1";
   assert.deepEqual(pieceMoves(before, after), [[8, 1]]);
   assert.deepEqual(pieceMoves(after, before), []);
+});
+
+test("gameCache without a storage keeps games in memory, apart from other caches", () => {
+  const a = gameCache(), b = gameCache();
+  a.cacheFinished({ id: "AbCd1234", status: "mate", winner: "white", moves: "e4", extra: true });
+  a.cacheFinished({ id: "Live1234", status: "started", moves: "e4" });
+  assert.deepEqual(a.finishedGame("AbCd1234"), {
+    id: "AbCd1234", rated: undefined, status: "mate", winner: "white", players: undefined, moves: "e4",
+    lastFen: undefined, lastMove: undefined, lastMoveAt: undefined, createdAt: undefined,
+    opening: undefined, daysPerTurn: undefined, clock: undefined,
+  });
+  assert.equal(a.finishedGame("Live1234"), undefined);
+  assert.equal(b.finishedGame("AbCd1234"), undefined);
 });

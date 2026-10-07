@@ -1,7 +1,7 @@
 // Everything tournament.html asks Lichess, and the games it keeps from it.
 // No DOM; network and localStorage only.
 
-import { ONGOING } from "./lib.js";
+import { gameCache } from "./lib.js";
 
 // A 429: the caller should back off before asking again.
 const rateError = () => Object.assign(new Error("rate"), { rate: true });
@@ -67,20 +67,7 @@ export async function fetchHistory(g) {
   return list;
 }
 
-// Finished games never change, so keep them in this browser and only ask
-// Lichess for games still in progress (or not seen yet).
-const CACHE_KEY = "tournament:finished-games:v3";
-const finishedCache = (() => {
-  try { return JSON.parse(localStorage.getItem(CACHE_KEY)) || {}; } catch { return {}; }
-})();
-
-// The export of a finished game seen before, or undefined.
-export const finishedGame = (id) => finishedCache[id];
-
-// Keeps an export if its game is over.
-export function cacheFinished(g) {
-  if (ONGOING.has(g.status)) return;
-  const { id, rated, status, winner, players, moves, lastFen, lastMove, lastMoveAt, createdAt, opening, daysPerTurn, clock } = g;
-  finishedCache[id] = { id, rated, status, winner, players, moves, lastFen, lastMove, lastMoveAt, createdAt, opening, daysPerTurn, clock };
-  try { localStorage.setItem(CACHE_KEY, JSON.stringify(finishedCache)); } catch { /* storage full or blocked */ }
-}
+// Finished games are kept in this browser's localStorage, which is missing
+// or throws when the browser blocks storage. gameCache() is in lib.js.
+const storage = (() => { try { return globalThis.localStorage; } catch { return undefined; } })();
+export const { finishedGame, cacheFinished } = gameCache(storage, "tournament:finished-games:v3");
