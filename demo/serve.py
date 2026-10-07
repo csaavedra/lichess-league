@@ -19,8 +19,8 @@ import argparse, html, http.server, json, mimetypes, pathlib, re, urllib.parse
 DEMO = pathlib.Path(__file__).resolve().parent
 ROOT = DEMO.parent
 THEMES = ROOT / "themes"
-# The page's own files besides tournament.html, lichess.js and the theme.
-PAGE_FILES = ["lib.js"]
+# The page's own files and folders besides tournament.html, lichess.js and the theme.
+PAGE_FILES = ["lib.js", "vendor"]
 
 
 def scenarios():
@@ -88,7 +88,10 @@ def site(theme, fallback):
         files[d + "tournament.json"] = p
         files[d + "lichess.js"] = DEMO / "mock.js"
         for name in PAGE_FILES:
-            files[d + name] = ROOT / name
+            src = ROOT / name
+            for f in sorted(src.rglob("*")) if src.is_dir() else [src]:
+                if f.is_file():
+                    files[d + f.relative_to(ROOT).as_posix()] = f
         for f in theme_files(use) if use else []:
             files[d + "theme/" + f.relative_to(use).as_posix()] = f
     return files

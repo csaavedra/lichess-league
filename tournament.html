@@ -363,7 +363,7 @@ import { fetchGame, fetchHistory, finishedGame, cacheFinished } from "./lichess.
 // chess.js is only used to replay the moves of a game. No engine is loaded anywhere on this page.
 // If it fails to load, the rest of the page still works; games just can't be stepped through.
 let Chess = null;
-try { ({ Chess } = await import("https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dist/esm/chess.js")); } catch {}
+try { ({ Chess } = await import("./vendor/chess.js")); } catch {}
 
 const PIECE_URL = "https://lichess1.org/assets/piece/cburnett/";
 const REASONS = {

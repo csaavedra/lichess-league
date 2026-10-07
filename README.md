@@ -131,9 +131,9 @@ HTTP; opening the file directly won't work. To try it on your computer:
 Then open http://localhost:8000/tournament.html.
 
 To put it online, copy `tournament.html` (renamed to `index.html` if you
-like), `lib.js`, `lichess.js` and `tournament.json` to any static host. On
-GitHub Pages, put those four files in a repository and turn on Pages in its
-settings.
+like), `lib.js`, `lichess.js`, the `vendor/` folder and `tournament.json` to
+any static host. On GitHub Pages, put those in a repository and turn on Pages
+in its settings.
 After that, updating the tournament means editing `tournament.json` there.
 
 ## Trying it without real games
@@ -169,10 +169,12 @@ to the page as `theme/`, or try it on all the demos with
 
 MIT. See [LICENSE](LICENSE).
 
-The page loads, without bundling them:
+The page comes with a copy of, in `vendor/` with its license:
 
-- [chess.js](https://github.com/jhlywa/chess.js) by Jeff Hlywa, BSD-2-Clause,
-  from jsDelivr.
+- [chess.js](https://github.com/jhlywa/chess.js) by Jeff Hlywa, BSD-2-Clause.
+
+And it loads, without bundling them:
+
 - The cburnett pieces by Colin M.L. Burnett, GPLv2+, from Lichess.
 - The chess font that draws the pieces in the moves, by the pgn4web authors,
   GPLv2+, from Lichess.
