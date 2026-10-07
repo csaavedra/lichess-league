@@ -9,6 +9,9 @@ It's a single page that you put on any static host. There is no server, no
 database and no account to create. For now it handles round-robin
 tournaments.
 
+To see it with made-up games, open the
+[demo](https://csaavedra.github.io/lichess-league/).
+
 <img src="screenshots/standings.png" width="640" alt="Standings of a tournament halfway through">
 
 ## What the page shows
@@ -147,7 +150,9 @@ Then open http://localhost:8000/demo/ and pick one:
 - `problems`: one game for each warning the page shows.
 - `unrated`: an unrated tournament with two rated games.
 
-Nothing is sent to Lichess.
+Nothing is sent to Lichess. The same tournaments are
+[online](https://csaavedra.github.io/lichess-league/), built from the
+latest version of the page.
 
 ## Changing the look
 
