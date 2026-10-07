@@ -1,7 +1,6 @@
 // Run with: node --test
 // fetch is replaced by a fake that answers like Lichess. The cache of
-// finished games needs localStorage, which Node doesn't have, so it's left
-// to the demo.
+// finished games is tested in cache.test.js.
 import { test, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { fetchGame, fetchHistory } from "../lichess.js";

@@ -12,7 +12,7 @@ the [README](README.md).
   pieces moved between two positions), with no DOM or network access.
 - `lichess.js`: the requests to Lichess and the cache of finished games.
 - `test/`: the tests of `lib.js` and `lichess.js`, the latter with a fake
-  `fetch`.
+  `fetch` and a fake `localStorage`.
 - `demo/`: made-up tournaments and a mock of the Lichess API.
 
 ## Tests
