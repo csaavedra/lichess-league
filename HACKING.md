@@ -14,8 +14,9 @@ the [README](README.md).
 - `lichess.js`: the requests to Lichess, and the cache of finished games
   kept in `localStorage`.
 - `test/`: the tests of `lib.js` and `lichess.js`, the latter with a fake
-  `fetch` and a fake `localStorage`.
-- `demo/`: made-up tournaments and a mock of the Lichess API.
+  `fetch` and a fake `localStorage`, and a check that the demo's stand-in
+  for `lichess.js` has the same exports.
+- `demo/`: made-up tournaments and a stand-in for `lichess.js`.
 
 ## Tests
 
@@ -42,11 +43,14 @@ The requests are in `lichess.js`, which also sets up the cache.
 Each scenario is a tournament file, `demo/NAME.json`, whose games have an
 extra `demo` field describing the game to fake: its result, whether the
 colours are swapped, whether it's rated, when the last move was made. The
-fields are listed at the top of `demo/mock.js`. `demo/serve.py` adds that
-script to the page, and it answers the page's Lichess requests from those
-fields, with random legal moves. To try a new situation, copy a scenario and
-edit it. Add `?moves` to a scenario's address, as in `/demo/halfway/?moves`,
-and its games in progress get a new move on every refresh.
+fields are listed at the top of `demo/mock.js`. `demo/serve.py` serves the
+page as it is, but with that file as its `lichess.js`: it has the same
+exports, makes up the games from those fields with random legal moves, and
+keeps finished games in memory only, so nothing is stored in the browser.
+When `lichess.js` gets a new export, the mock needs it too; `node --test`
+checks. To try a new situation, copy a scenario and edit it. Add `?moves` to
+a scenario's address, as in `/demo/halfway/?moves`, and its games in
+progress get a new move on every refresh.
 
 The demo pages use `theme/` like the real page. To try another theme without
 touching it, pass its folder: `python3 demo/serve.py --theme some/folder`.
