@@ -4,9 +4,9 @@
     python3 demo/serve.py [--theme DIR] [port]
 
 Then open http://localhost:8000/demo/. Each scenario NAME.json in this folder
-is a tournament file served at /demo/NAME/, where demo/mock.js answers the
-page's Lichess requests from the "demo" field of each game. With --theme, the
-pages use the theme in DIR instead of theme/.
+is a tournament file served at /demo/NAME/, with demo/mock.js as the page's
+lichess.js, which makes up the games from the "demo" field of each game. With
+--theme, the pages use the theme in DIR instead of theme/.
 """
 import argparse, http.server, pathlib, re
 
@@ -34,18 +34,16 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         path = self.path.split("?")[0]
         if path in ("/", "/demo", "/demo/"):
             return self.index()
-        if path == "/demo/mock.js":
-            return self.reply((DEMO / "mock.js").read_bytes(), "text/javascript")
         m = PAGE.match(path)
         if not m or not (DEMO / f"{m[1]}.json").is_file():
             return super().do_GET()
         name, rest = m[1], m[2]
         if rest in ("", "index.html"):
-            html = (ROOT / "tournament.html").read_text()
-            html = html.replace("<head>", '<head>\n<script src="/demo/mock.js"></script>', 1)
-            return self.reply(html.encode(), "text/html; charset=utf-8")
+            return self.reply((ROOT / "tournament.html").read_bytes(), "text/html; charset=utf-8")
         if rest == "tournament.json":
             return self.reply((DEMO / f"{name}.json").read_bytes(), "application/json")
+        if rest == "lichess.js":
+            return self.reply((DEMO / "mock.js").read_bytes(), "text/javascript")
         if THEME and rest.startswith("theme/"):
             self.path = "/" + str(THEME.relative_to(ROOT)) + rest[len("theme"):]
             return super().do_GET()
