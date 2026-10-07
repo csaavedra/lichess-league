@@ -1,5 +1,6 @@
 {
   "title": "Demo: unrated",
+  "demo": "An unrated tournament with two rated games.",
   "subtitle": "An unrated tournament with two rated games, which get flagged",
 
   "players": [
