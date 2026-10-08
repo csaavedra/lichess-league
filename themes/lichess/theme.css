@@ -59,7 +59,7 @@ body { background: var(--page) linear-gradient(to bottom, var(--page-top), var(-
 .table-scroll, .game { border-color: transparent; }
 .game:hover { border-color: var(--accent); }
 .game.pending:hover { border-color: transparent; }
-h1 { font-weight: 400; }
+h1 { font-weight: 300; }
 h2 { font-size: 20px; }
 
 /* Striped rows instead of lines. */
