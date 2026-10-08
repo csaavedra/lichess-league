@@ -129,6 +129,8 @@ export function pieceMoves(fromFen, toFen) {
 
 // ---------- standings ----------
 // rounds: [{ ids }], games: Map id -> summary, players: Map username -> { username, name, seed, seedRating }.
+// Returns the players in standings order, each with its rank from 1: the
+// tiebreaks go down to the name, so no two players share one.
 export function computeStandings(rounds, games, players, sc = DEFAULT_SCORING) {
   const P = new Map();
   const ensure = (id, username, fromGame) => {
@@ -173,10 +175,12 @@ export function computeStandings(rounds, games, players, sc = DEFAULT_SCORING) {
     p.tied = tied.length > 0;
     p.tiedWins = tied.reduce((n, o) => n + (p.cells.get(o.id) || []).filter((c) => c.kind === "w").length, 0);
   });
-  return list.sort((a, b) =>
+  list.sort((a, b) =>
     b.pts - a.pts || b.tiedWins - a.tiedWins || b.sb - a.sb || b.wins - a.wins ||
     (seedOf(a.id) ?? Infinity) - (seedOf(b.id) ?? Infinity) || nameOf(a).localeCompare(nameOf(b))
   );
+  list.forEach((p, i) => { p.rank = i + 1; });
+  return list;
 }
 
 // ---------- rounds ----------

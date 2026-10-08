@@ -158,6 +158,7 @@ table.cross { border-collapse: collapse; width: 100%; font-variant-numeric: tabu
 .chip.b { background: #222; }
 .side .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
 .side .rt { color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; }
+.side .rk { color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; }
 .side .sc { font-variant-numeric: tabular-nums; }
 .side.to-move .nm::after {
   content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%;
@@ -474,6 +475,13 @@ const displayName = (p) => config.roster.get(p.id)?.name || p.username;
 const nameOf = (id) => config.roster.get(id)?.name || config.roster.get(id)?.username || id;
 
 const standings = () => computeStandings(config.rounds, state.games, config.roster, config.scoring);
+// Each player's rank, from the last standings rendered: the games and the
+// dialog show it next to the names, as Lichess does in its tournaments.
+let ranks = new Map();
+function rankHTML(id) {
+  const r = ranks.get(id);
+  return r ? `<span class="rk" title="${ordinal(r)} in the standings">#${r}</span>` : "";
+}
 
 // ---------- rendering ----------
 function boardHTML(fen, last) {
@@ -494,6 +502,7 @@ function sq(r, f, piece, last) {
 
 function renderStandings() {
   const rows = standings();
+  ranks = new Map(rows.map((p) => [p.id, p.rank]));
   const t = document.getElementById("cross");
   if (!rows.length) {
     t.innerHTML = '<tbody><tr><td class="name blank">Players appear here once you add usernames or game IDs to tournament.json.</td></tr></tbody>';
@@ -502,10 +511,10 @@ function renderStandings() {
   let html = '<thead><tr><th>#</th><th class="name">Player</th><th title="Starting seed">Seed</th>';
   rows.forEach((_, i) => { html += `<th>${i + 1}</th>`; });
   html += '<th>Pts</th><th title="Wins against the players tied on points">TW</th><th title="Sonneborn–Berger">SB</th><th>Wins</th><th>Played</th></tr></thead><tbody>';
-  rows.forEach((p, i) => {
+  rows.forEach((p) => {
     const nm = displayName(p);
     const sub = nm !== p.username ? `<small>${esc(p.username)}</small>` : "";
-    html += `<tr><td class="rank">${i + 1}</td><td class="name"><button type="button" class="pname" data-player="${esc(p.id)}" aria-label="${esc(nm)}, show performance"><strong>${esc(nm)}</strong>${sub}</button></td><td class="minor">${seedOf(p.id) ?? ""}</td>`;
+    html += `<tr><td class="rank">${p.rank}</td><td class="name"><button type="button" class="pname" data-player="${esc(p.id)}" aria-label="${esc(nm)}, show performance"><strong>${esc(nm)}</strong>${sub}</button></td><td class="minor">${seedOf(p.id) ?? ""}</td>`;
     rows.forEach((o) => {
       if (o.id === p.id) { html += '<td class="res self"></td>'; return; }
       const list = p.cells.get(o.id) || [];
@@ -567,11 +576,11 @@ function ratingHTML(p, withDiff) {
 function sideHTML(p, color, g, withDiff = false) {
   const toMove = !g.result && g.turn === color;
   const score = scoreOf(g, color);
-  return `<div class="side${toMove ? " to-move" : ""}${score === 0 ? " lost" : ""}"><span class="chip ${color[0]}"></span><span class="nm">${esc(displayName(p))}${ratingHTML(p, withDiff)}</span><span class="sc">${score === null ? "" : fmtPts(score)}</span></div>`;
+  return `<div class="side${toMove ? " to-move" : ""}${score === 0 ? " lost" : ""}"><span class="chip ${color[0]}"></span>${rankHTML(p.id)}<span class="nm">${esc(displayName(p))}${ratingHTML(p, withDiff)}</span><span class="sc">${score === null ? "" : fmtPts(score)}</span></div>`;
 }
 
 function plainSideHTML(id, color) {
-  return `<div class="side"><span class="chip ${color[0]}"></span><span class="nm">${esc(nameOf(id))}</span></div>`;
+  return `<div class="side"><span class="chip ${color[0]}"></span>${rankHTML(id)}<span class="nm">${esc(nameOf(id))}</span></div>`;
 }
 
 function statusText(g) {
@@ -846,8 +855,7 @@ function tile(k, v, s, cls) {
 function renderPlayer() {
   const pid = state.player;
   const table = standings();
-  const rank = table.findIndex((p) => p.id === pid);
-  const row = table[rank];
+  const row = table.find((p) => p.id === pid);
   if (!row) return;
   const list = playerGames(pid, config.rounds, state.games);
   const st = playerStats(list, config.roster, config.scoring);
@@ -864,13 +872,13 @@ function renderPlayer() {
     }));
   const cfgP = config.roster.get(pid) || {};
   const seed = cfgP.seed ?? null;
-  const moved = seed != null ? seed - (rank + 1) : 0;
+  const moved = seed != null ? seed - row.rank : 0;
   const pct = st.n ? Math.round((st.frac / st.n) * 100) : null;
   const colorLine = (c) => `With ${c}: ` + (st[c].n ? `<b>${fmtPts(st[c].pts)} of ${st[c].n}</b>` : "no finished games");
-  const now = `now ${ordinal(rank + 1)}`;
+  const now = `now ${ordinal(row.rank)}`;
 
   const tiles = [
-    tile("Rank", `${rank + 1}<small>/${table.length}</small>`, `${row.tied ? `TW ${row.tiedWins} · ` : ""}SB ${fmtPts(row.sb)} · ${plural(row.wins, "win")}`),
+    tile("Rank", `${row.rank}<small>/${table.length}</small>`, `${row.tied ? `TW ${row.tiedWins} · ` : ""}SB ${fmtPts(row.sb)} · ${plural(row.wins, "win")}`),
     seed != null ? tile("Seed", seed, moved ? `${now}, ${moved > 0 ? "up" : "down"} ${plural(Math.abs(moved), "place")}` : `${now}, as seeded`, trend(moved)) : "",
     tile("Points", fmtPts(st.pts), st.n ? `from ${plural(st.n, "finished game")}, ${pct}%` : "no finished games yet"),
     tile("Won · drawn · lost", `<span class="w">${st.w}</span> · <span class="d">${st.d}</span> · <span class="l">${st.l}</span>`, st.live ? `${st.live} in progress` : "none in progress"),
