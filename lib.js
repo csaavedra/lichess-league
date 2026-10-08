@@ -3,9 +3,9 @@
 // Tested by test/lib.test.js (node --test).
 
 export const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-export const ONGOING = new Set(["created", "started"]);
+const ONGOING = new Set(["created", "started"]);
 const VOID = new Set(["aborted", "noStart"]);
-export const DEFAULT_SCORING = { win: 1, draw: 0.5, loss: 0 };
+const DEFAULT_SCORING = { win: 1, draw: 0.5, loss: 0 };
 
 export const fmtPts = (n) => {
   const whole = Math.floor(n), frac = n - whole;
@@ -34,7 +34,7 @@ export function fmtLeft(ms) {
 
 // ---------- config parsing ----------
 // "https://lichess.org/AbCd1234WxYz?x" -> "AbCd1234WxYz"
-export const stripLink = (raw) => String(raw || "").trim().replace(/^https?:\/\/[^/]+\//i, "").split(/[/?#]/)[0];
+const stripLink = (raw) => String(raw || "").trim().replace(/^https?:\/\/[^/]+\//i, "").split(/[/?#]/)[0];
 export function extractId(raw) {
   const id = stripLink(raw).slice(0, 8);
   return /^[A-Za-z0-9]{8}$/.test(id) ? id : null;

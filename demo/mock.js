@@ -94,7 +94,6 @@ export async function fetchGame(id) {
   const side = (u, color) => ({ user: { id: u.toLowerCase(), name: u }, rating: seed(u), ratingDiff: diff(color) });
 
   const clock = d.clock && { initial: d.clock.minutes * 60, increment: d.clock.increment ?? 0 };
-  if (clock) clock.totalTime = clock.initial + 40 * clock.increment;
   const daysPerTurn = clock ? undefined : d.daysPerTurn ?? 3;
   const createdAt = now - (parsed.rounds.length + 1 - r) * 10 * DAY;
   const lastMoveAt = finished ? createdAt + 8 * DAY : extra ? Date.now() : plies ? now - (d.hoursAgo ?? rand() * 30) * HOUR : undefined;
