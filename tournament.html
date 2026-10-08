@@ -159,7 +159,8 @@ table.cross { border-collapse: collapse; width: 100%; font-variant-numeric: tabu
 /* The name gives way before the rating: only the name is cut short. */
 .side .who { display: flex; align-items: baseline; gap: 0.25em; flex: 1; min-width: 0; }
 .side .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.side .rt { color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; flex: none; }
+.side .rt { color: color-mix(in srgb, var(--muted) 90%, var(--surface)); font-size: 0.85em; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; flex: none; }
+.rt .pv { opacity: 0.6; } /* the provisional mark, on nearly every rating early on */
 .side .rk { color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; }
 .side .sc { font-variant-numeric: tabular-nums; }
 .side.to-move .who::after {
@@ -572,7 +573,7 @@ function renderTabs() {
 function ratingHTML(p, withDiff) {
   if (p.rating == null) return "";
   const diff = withDiff && p.ratingDiff != null ? ` <span class="${trend(p.ratingDiff)}">${signed(p.ratingDiff)}</span>` : "";
-  return ` <span class="rt">(${p.rating}${p.provisional ? "?" : ""})${diff}</span>`;
+  return ` <span class="rt">${p.rating}${p.provisional ? '<span class="pv">?</span>' : ""}${diff}</span>`;
 }
 
 function sideHTML(p, color, g, withDiff = false) {

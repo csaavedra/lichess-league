@@ -83,7 +83,8 @@ h2 { font-size: 20px; }
 
 /* Game cards as the boards of a Lichess Swiss tournament: the board fills
    the card, between two thin player lines with the rank in bold and the
-   name in regular weight. The dot for the side to move is in the orange of
+   name in regular weight, the rating light and a little smaller, in the
+   text colour. The dot for the side to move is in the orange of
    a running clock. */
 .games { gap: 8px; }
 .game { padding: 0; gap: 0; overflow: hidden; }
@@ -91,7 +92,8 @@ h2 { font-size: 20px; }
 .side { padding: 3px 8px; font-size: 14px; }
 .side .rk { color: inherit; font-weight: 700; }
 .side .nm { font-weight: 400; }
-.side .rt { font-size: 0.9em; font-weight: 400; }
+.side .rt { color: inherit; font-size: 0.9em; font-weight: 300; }
+.rt .pv { opacity: 1; }
 .side.to-move .who::after { background: var(--clock); }
 .game .status { padding: 6px 8px 8px; }
 .game .status + .status { padding-top: 0; }
