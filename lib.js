@@ -419,8 +419,8 @@ export function parseConfig(cfg) {
   });
   const num = (n) => (Number.isFinite(n) ? n : null);
   const roster = new Map(
-    (cfg.players || []).filter((p) => p.username).map((p) => [p.username.toLowerCase(), {
-      username: p.username, name: p.name || "",
+    (cfg.players || []).filter((p) => user(p.username)).map((p) => [user(p.username), {
+      username: String(p.username).trim(), name: p.name || "",
       seed: num(p.seed), seedRating: num(p.seedRating), seedBasis: p.seedBasis || "",
     }])
   );
