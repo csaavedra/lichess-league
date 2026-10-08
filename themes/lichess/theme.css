@@ -28,11 +28,12 @@
   --sq-light: #f0d9b5;
   --sq-dark: #b58863;
   --last: rgba(155, 199, 0, 0.41);
-  --shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.14), 0 3px 1px -2px rgba(0, 0, 0, 0.2), 0 1px 5px 0 rgba(0, 0, 0, 0.12);
+  --clock: #d64f00;
+  --shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.08), 0 3px 1px -2px rgba(0, 0, 0, 0.18), 0 1px 5px 0 rgba(0, 0, 0, 0.1);
   --font-display: "Noto Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-text: var(--font-display);
   --display-weight: 400;
-  --radius: 4px;
+  --radius: 7px;
   --radius-sm: 3px;
 }
 @media (prefers-color-scheme: dark) {
@@ -77,10 +78,20 @@ h2 { font-size: 20px; }
   color: color-mix(in oklab, var(--warn) 60%, var(--surface)); font-weight: inherit;
 }
 
-/* The rank before each name in bold and the name in regular weight, as on
-   the boards of a Lichess Swiss tournament. */
+/* Game cards as the boards of a Lichess Swiss tournament: the board fills
+   the card, between two thin player lines with the rank in bold and the
+   name in regular weight. The dot for the side to move is in the orange of
+   a running clock. */
+.games { gap: 8px; }
+.game { padding: 0; gap: 0; overflow: hidden; }
+.game .board { border-radius: 0; }
+.side { padding: 3px 8px; font-size: 14px; }
 .side .rk { color: inherit; font-weight: 700; }
-.side .nm { font-weight: 500; }
+.side .nm { font-weight: 400; }
+.side .rt { font-size: 0.9em; font-weight: 400; }
+.side.to-move .nm::after { background: var(--clock); }
+.game .status { padding: 6px 8px 8px; }
+.game .status + .status { padding-top: 0; }
 
 /* Blue for hovered buttons, the selected round and links. */
 button:not([aria-disabled="true"]):hover, .tabs button:hover { color: var(--accent); border-color: var(--accent); }
