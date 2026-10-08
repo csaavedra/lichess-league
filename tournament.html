@@ -156,13 +156,15 @@ table.cross { border-collapse: collapse; width: 100%; font-variant-numeric: tabu
 .side .chip { position: relative; top: 1px; } /* as vertical-align: -1px does for the chips in text */
 .chip.w { background: #fafaf5; }
 .chip.b { background: #222; }
-.side .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
-.side .rt { color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; }
+/* The name gives way before the rating: only the name is cut short. */
+.side .who { display: flex; align-items: baseline; gap: 0.25em; flex: 1; min-width: 0; }
+.side .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.side .rt { color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; flex: none; }
 .side .rk { color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; }
 .side .sc { font-variant-numeric: tabular-nums; }
-.side.to-move .nm::after {
-  content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%;
-  background: var(--accent); margin-left: 7px; vertical-align: 2px;
+.side.to-move .who::after {
+  content: ""; flex: none; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--accent); margin-left: 3px; align-self: center;
 }
 .side.lost { color: var(--muted); font-weight: 500; }
 .status { font-size: 13.5px; color: var(--muted); line-height: 1.4; }
@@ -576,11 +578,11 @@ function ratingHTML(p, withDiff) {
 function sideHTML(p, color, g, withDiff = false) {
   const toMove = !g.result && g.turn === color;
   const score = scoreOf(g, color);
-  return `<div class="side${toMove ? " to-move" : ""}${score === 0 ? " lost" : ""}"><span class="chip ${color[0]}"></span>${rankHTML(p.id)}<span class="nm">${esc(displayName(p))}${ratingHTML(p, withDiff)}</span><span class="sc">${score === null ? "" : fmtPts(score)}</span></div>`;
+  return `<div class="side${toMove ? " to-move" : ""}${score === 0 ? " lost" : ""}"><span class="chip ${color[0]}"></span>${rankHTML(p.id)}<span class="who"><span class="nm">${esc(displayName(p))}</span>${ratingHTML(p, withDiff)}</span><span class="sc">${score === null ? "" : fmtPts(score)}</span></div>`;
 }
 
 function plainSideHTML(id, color) {
-  return `<div class="side"><span class="chip ${color[0]}"></span>${rankHTML(id)}<span class="nm">${esc(nameOf(id))}</span></div>`;
+  return `<div class="side"><span class="chip ${color[0]}"></span>${rankHTML(id)}<span class="who"><span class="nm">${esc(nameOf(id))}</span></span></div>`;
 }
 
 function statusText(g) {
@@ -951,6 +953,14 @@ document.getElementById("games").addEventListener("click", (e) => {
 document.getElementById("games").addEventListener("keydown", (e) => {
   const c = e.target.closest(".game[data-id]");
   if (c && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openGame(c.dataset.id); }
+});
+// A name cut short shows in full on hover. Checked on each hover, as the
+// cards and the dialog reflow with the window.
+document.addEventListener("mouseover", (e) => {
+  const nm = e.target.closest?.(".side .nm");
+  if (!nm) return;
+  if (nm.scrollWidth > nm.clientWidth) nm.title = nm.textContent;
+  else nm.removeAttribute("title");
 });
 const dlg = document.getElementById("dlg");
 dlg.addEventListener("click", (e) => {

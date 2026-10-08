@@ -92,7 +92,7 @@ h2 { font-size: 20px; }
 .side .rk { color: inherit; font-weight: 700; }
 .side .nm { font-weight: 400; }
 .side .rt { font-size: 0.9em; font-weight: 400; }
-.side.to-move .nm::after { background: var(--clock); }
+.side.to-move .who::after { background: var(--clock); }
 .game .status { padding: 6px 8px 8px; }
 .game .status + .status { padding-top: 0; }
 
