@@ -97,6 +97,7 @@ test("equal on points, TW and SB: wins decide, then seed", () => {
   assert.deepEqual([p.a.sb, p.d.sb, p.b.sb], [0.5, 0.5, 0.5]);
   assert.deepEqual([p.a.tiedWins, p.d.tiedWins, p.b.tiedWins], [0, 0, 0]);
   assert.deepEqual(rows.map((r) => r.id), ["d", "a", "b", "e", "c"]);
+  assert.deepEqual(rows.map((r) => r.rank), [1, 2, 3, 4, 5]);
 });
 
 test("SB leaves out games in progress", () => {
