@@ -77,6 +77,11 @@ h2 { font-size: 20px; }
   color: color-mix(in oklab, var(--warn) 60%, var(--surface)); font-weight: inherit;
 }
 
+/* The rank before each name in bold and the name in regular weight, as on
+   the boards of a Lichess Swiss tournament. */
+.side .rk { color: inherit; font-weight: 700; }
+.side .nm { font-weight: 500; }
+
 /* Blue for hovered buttons, the selected round and links. */
 button:not([aria-disabled="true"]):hover, .tabs button:hover { color: var(--accent); border-color: var(--accent); }
 .tabs button[aria-selected="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
