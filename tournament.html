@@ -1066,10 +1066,10 @@ function showGames() {
 
 // ---------- start ----------
 renderAll();
-refresh();
-(function loop() {
+// The loop starts after the first refresh, which reads refreshSeconds.
+refresh().then(function loop() {
   setTimeout(() => { if (!document.hidden) refresh(); loop(); }, config.refreshSeconds * 1000);
-})();
+});
 setInterval(() => {
   tickDeadlines();
   if (state.lastUpdate && !busy && !syncMsg) renderSync();
