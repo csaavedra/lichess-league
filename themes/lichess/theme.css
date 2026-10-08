@@ -7,7 +7,7 @@
   images: only its colours. Noto Sans is by the Noto Project Authors, under
   the SIL Open Font License, and loaded here from Google Fonts.
 */
-@import url("https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans:wght@300;400;500;600;700&display=swap");
 
 :root {
   --page: hsl(37 10% 92%);
@@ -24,7 +24,6 @@
   --warn: hsl(0 68% 50%);
   --warn-soft: hsl(0 68% 50% / 0.1);
   --live: hsl(88 62% 37%);
-  --draw: hsl(37 74% 48%);
   --sq-light: #f0d9b5;
   --sq-dark: #b58863;
   --last: rgba(155, 199, 0, 0.41);
@@ -51,7 +50,6 @@
     --accent-soft: hsl(209 79% 56% / 0.25);
     --warn: hsl(0 60% 58%);
     --warn-soft: hsl(0 60% 50% / 0.15);
-    --draw: hsl(37 74% 43%);
   }
 }
 
@@ -70,13 +68,18 @@ h2 { font-size: 20px; }
 .cross th, .cross td, .pgames th, .pgames td { border-bottom-color: transparent; }
 .pgames tbody tr:hover td { background: var(--self); }
 
-/* Results coloured as in Lichess's Swiss standings, and rating changes in
-   its green and red. */
+/* Results as in Lichess's Swiss standings, wins green, draws grey and
+   losses red, and rating changes in the same green and red. */
 :is(.cross td.res, .pgames td.r, .tile .v) .w, .tile .v.up, .pgames .up, .side .up { color: var(--live); }
-:is(.cross td.res, .pgames td.r, .tile .v) .d { color: color-mix(in oklab, var(--draw) 70%, var(--surface)); }
+:is(.cross td.res, .pgames td.r, .tile .v) .d { color: var(--muted); }
 :is(.cross td.res, .pgames td.r, .tile .v) .l, .tile .v.down, .pgames .down, .side .down {
   color: color-mix(in oklab, var(--warn) 60%, var(--surface)); font-weight: inherit;
 }
+
+/* The standings in Lichess's weights: light rank and tiebreaks, bold
+   points, and no colour for the leader. */
+.cross td.rank, .cross td.minor { font-weight: 300; }
+.cross tbody tr:first-child td.pts { color: inherit; }
 
 /* Game cards as the boards of a Lichess Swiss tournament: the board fills
    the card, between two thin player lines with the rank in bold and the
