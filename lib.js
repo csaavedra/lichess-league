@@ -33,14 +33,11 @@ export function fmtLeft(ms) {
 }
 
 // ---------- config parsing ----------
-// "https://lichess.org/AbCd1234WxYz?x" -> "AbCd1234WxYz"
-const stripLink = (raw) => String(raw || "").trim().replace(/^https?:\/\/[^/]+\//i, "").split(/[/?#]/)[0];
+// "https://lichess.org/AbCd1234WxYz?x" -> "AbCd1234"
 export function extractId(raw) {
-  const id = stripLink(raw).slice(0, 8);
+  const id = String(raw || "").trim().replace(/^https?:\/\/[^/]+\//i, "").split(/[/?#]/)[0].slice(0, 8);
   return /^[A-Za-z0-9]{8}$/.test(id) ? id : null;
 }
-// A 12-character ID is a game ID plus a player's private token.
-export const isPrivateId = (raw) => /^[A-Za-z0-9]{12}$/.test(stripLink(raw));
 
 // ---------- games ----------
 // A player's score in a game: 1, ½ or 0, or null while it's being played or when it doesn't count.
@@ -433,12 +430,9 @@ export function parseConfig(cfg) {
 
   const allSlots = rounds.flatMap((r) => r.slots);
   const badIds = allSlots.filter((x) => x.raw && !x.id).map((x) => x.raw);
-  // Name these by their first 8 characters only, so the page doesn't show the token itself.
-  const privateIds = allSlots.filter((x) => isPrivateId(x.raw)).map((x) => x.id);
   const unknown = [...new Set(allSlots.flatMap((x) => [x.white, x.black]).filter((u) => !roster.has(u)))];
   const warnings = [];
   if (unknown.length) warnings.push(`These usernames appear in the schedule in tournament.json but not in its players list: ${unknown.map((u) => u || "(empty)").join(", ")}.`);
-  if (privateIds.length) warnings.push(`These game IDs in tournament.json include a player's private token: ${privateIds.join(", ")}. Keep only their first 8 characters. The extra 4 let anyone move for that player, and should never be shared.`);
   if (badIds.length) warnings.push(`These entries in tournament.json are not valid Lichess game IDs and were skipped: ${badIds.join(", ")}.`);
   if (tc.error) warnings.push(tc.error);
   if (fmt.error) warnings.push(fmt.error);

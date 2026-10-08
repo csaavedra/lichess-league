@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  START_FEN, DAY_MS, fmtPts, plural, deadlineOf, fmtLeft, extractId, isPrivateId, summarize,
+  START_FEN, DAY_MS, fmtPts, plural, deadlineOf, fmtLeft, extractId, summarize,
   computeStandings, scheduleMismatch, ratedMismatch, playerGames, playerStats,
   parseTimeControl, gameTimeControl, fmtTimeControl, timeControlMismatch, challengeUrl,
   parseFormat, endOf, tournamentSpan, fmtSpan, gameDates, subtitleText, refreshSeconds, parseConfig,
@@ -317,17 +317,13 @@ test("challengeUrl: White challenges Black with the tournament's settings", () =
   assert.deepEqual(parse(challengeUrl(slot, { rated: true, timeControl: null })), { user: "bob", color: "white", variant: "standard", gameMode: "rated" });
 });
 
-test("extractId and the private token check", () => {
+test("extractId", () => {
   assert.equal(extractId("AbCd1234"), "AbCd1234");
   assert.equal(extractId(" https://lichess.org/AbCd1234WxYz?x=1 "), "AbCd1234");
   assert.equal(extractId("https://lichess.org/AbCd1234/black#12"), "AbCd1234");
   assert.equal(extractId("abc"), null);
   assert.equal(extractId("AbCd-234"), null);
   assert.equal(extractId(""), null);
-  assert.ok(isPrivateId("AbCd1234WxYz"));
-  assert.ok(isPrivateId("https://lichess.org/AbCd1234WxYz"));
-  assert.ok(!isPrivateId("AbCd1234"));
-  assert.ok(!isPrivateId("https://lichess.org/AbCd1234/black"));
 });
 
 test("fmtPts", () => {
@@ -504,13 +500,11 @@ test("parseConfig: warnings", () => {
     timeControl: { days: 4 },
     format: "swiss",
   });
-  assert.equal(c.warnings.length, 5);
+  assert.equal(c.warnings.length, 4);
   assert.match(c.warnings[0], /not in its players list: b, \(empty\)\./);
-  assert.match(c.warnings[1], /private token: AbCd1234\./);
-  assert.doesNotMatch(c.warnings.join(" "), /WxYz/);
-  assert.match(c.warnings[2], /not valid Lichess game IDs and were skipped: nope\./);
-  assert.match(c.warnings[3], /timeControl/);
-  assert.match(c.warnings[4], /format/);
+  assert.match(c.warnings[1], /not valid Lichess game IDs and were skipped: nope\./);
+  assert.match(c.warnings[2], /timeControl/);
+  assert.match(c.warnings[3], /format/);
   assert.equal(c.timeControl, null);
   assert.equal(c.format, null);
 });
