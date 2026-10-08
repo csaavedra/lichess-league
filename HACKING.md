@@ -16,6 +16,8 @@ the [README](README.md).
 - `themes/`: sample themes (see [Theming](#theming)).
 - `vendor/`: copies of what the page uses from other projects, made by
   `tools/vendor.py` (see [Copied files](#copied-files)).
+- `screenshots/`: the README's screenshots, made by `tools/screenshots.py`
+  (see [Screenshots](#screenshots)).
 - `.github/workflows/pages.yml`: on every push to main, runs the tests and
   publishes the demo to https://csaavedra.github.io/lichess-league/. A main
   that fails its tests isn't published.
@@ -88,6 +90,23 @@ check now and then, for example before a new tournament:
 Then run `python3 tools/vendor.py`, check the page and the demo (the fonts,
 and that games can still be stepped through), and commit `vendor/` and
 `themes/lichess/fonts/`.
+
+## Screenshots
+
+The README shows two screenshots of the demo in the default look, 640px wide:
+`standings.png`, the top of the halfway demo down to the end of the
+crosstable, and `games.png`, round 1 of the problems demo with its warnings.
+Retake them after a change to how either looks:
+
+    python3 tools/screenshots.py
+
+It needs Chrome and ImageMagick, and uses optipng if it's there. It takes
+the pages from `demo/serve.py --out`, so a private `theme/` never shows,
+renames the halfway demo to "Club Correspondence League", and captures each
+at twice the pixel density: the standings 760px wide and the games 680px
+wide, the narrowest widths with every column, and three cards in a row. The
+crops follow the page's headings, table and cards, so they keep the same
+framing when the layout changes. Look at both before committing them.
 
 ## Theming
 
