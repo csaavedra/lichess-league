@@ -360,6 +360,7 @@ const state = {
   open: null,           // game view: { id, positions, ply, back }
   player: null,         // player view: player id
 };
+let roundSettled = false; // until the first fetch or a click, the round shown can still move to currentRound()
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 // Move buttons are drawn, not typed: arrow characters come from whichever
@@ -995,13 +996,13 @@ document.getElementById("refresh").addEventListener("click", () => refresh(true)
 const FILE_HINT = " Browsers don't let a page opened straight from disk read other files. Serve the folder instead, for example with python3 -m http.server, and open http://localhost:8000/tournament.html.";
 const RATE_PAUSE_MS = 120000;
 let busy = false, retryTimer = null;
-let roundSettled = false; // until the first fetch or a click, the round shown can still move to currentRound()
 async function refresh(manual) {
   if (busy) return;
   busy = true;
   try {
+    let changed = false;
     try {
-      if (await loadConfig()) renderAll();
+      changed = await loadConfig();
       notices.config = "";
     } catch (err) {
       notices.config = `Could not read tournament.json. ${err.message || ""}` +
@@ -1010,9 +1011,9 @@ async function refresh(manual) {
     }
     renderNotice();
     if (configText === null) { renderSync("No tournament data"); return; }
+    // Show what we already have (the file, cached finished games, earlier fetches) right away.
+    if (changed || !state.lastUpdate) { showGames(); renderAll(); }
     if (!config.allIds.length) { renderSync("No games added yet"); return; }
-    // Show what we already have (cached finished games, earlier fetches) right away.
-    if (!state.lastUpdate) { showGames(); renderAll(); }
     if (!manual && Date.now() < state.pausedUntil) return;
     renderSync("Updating…");
     for (const id of config.allIds.filter((id) => !finishedGame(id))) {
@@ -1026,7 +1027,6 @@ async function refresh(manual) {
     if (!roundSettled) { state.round = currentRound(config.rounds, state.games); roundSettled = true; }
     state.lastUpdate = Date.now();
     notices.fetch = "";
-    renderNotice();
     renderSync();
     renderAll();
     await updateHistories();
