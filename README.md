@@ -26,10 +26,8 @@ To see it with made-up games, open the
 - For each game not started yet, a link for White to send the challenge.
 
 Game data comes from Lichess and the page refreshes it every few minutes,
-so it can stay open on a screen.
-
-There is no engine or evaluation anywhere on the page, on purpose: games
-may still be in progress.
+so it can stay open on a screen. There is no engine or evaluation anywhere
+on the page, on purpose: games may still be in progress.
 
 Players can also create their challenges by hand, and mistakes happen, so
 the page checks every game against the schedule and warns when:
@@ -52,8 +50,9 @@ the page checks every game against the schedule and warns when:
 3. Put the page online (see [Publishing](#publishing)) and share the link
    with the players.
 4. When a round starts, White sends the challenge from the link next to
-   their game. It comes with the right opponent, colours, time control and
-   rating already set.
+   their game, and Black waits for it. The link comes with the opponent,
+   colours, time control and rating already set; Lichess won't send it if
+   any of them is changed on the form.
 5. Once a game starts, add its ID to `tournament.json`. From then on the
    page follows the game on its own, until it's over.
 
@@ -97,28 +96,14 @@ is all it takes to keep the tournament up to date.
 
 ## Standings
 
-Ties on points are broken, in order, by:
-
-1. TW: wins against the other players on the same points (draws don't count)
-2. Sonneborn–Berger
-3. Total wins
-4. Seed
+Ties on points are broken, in order, by TW (wins against the other players
+on the same points; draws don't count), Sonneborn–Berger, total wins and
+seed.
 
 Performance uses Lichess's tournament formula: the average of each
 opponent's seed rating, +500 for a win and −500 for a loss. Seed ratings
 are used instead of current Lichess ratings because those change from game
 to game.
-
-## For players
-
-- Your games are listed by round. When it's your turn to play White, use the
-  link next to your game to send the challenge. Don't change anything on
-  the form: Lichess won't send it if the time control, rating or colour
-  is changed.
-- If you play Black, wait for your opponent's challenge.
-- When you send your game to the organizer, send only the first 8
-  characters of its ID. The link you see while playing has 4 more that let
-  anyone move for you.
 
 ## Publishing
 
@@ -133,24 +118,16 @@ Then open http://localhost:8000/tournament.html.
 To put it online, copy `tournament.html` (renamed to `index.html` if you
 like), `lib.js`, `lichess.js`, the `vendor/` folder and `tournament.json` to
 any static host. On GitHub Pages, put those in a repository and turn on Pages
-in its settings.
-After that, updating the tournament means editing `tournament.json` there.
+in its settings. After that, updating the tournament means editing
+`tournament.json` there.
 
 ## Trying it without real games
 
 `demo/` has made-up tournaments, to see how the page looks before you have
-real games:
-
-    python3 demo/serve.py
-
-Then open http://localhost:8000/demo/ and pick one:
-
-- `halfway`: finished, live and upcoming rounds.
-- `finished`: every game played, with ties in the standings.
-- `problems`: one game for each warning the page shows.
-- `unrated`: an unrated tournament with two rated games.
-
-Nothing is sent to Lichess. The same tournaments are
+real games: a tournament halfway through, a finished one, one with a game
+for each warning the page shows, and an unrated one. Run
+`python3 demo/serve.py` and open http://localhost:8000/demo/. Nothing is
+sent to Lichess. The same tournaments are
 [online](https://csaavedra.github.io/lichess-league/), built from the
 latest version of the page.
 
