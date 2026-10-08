@@ -17,7 +17,7 @@ replaces it.
 import base64, hashlib, io, json, pathlib, re, shutil, tarfile, urllib.request
 
 CHESS_JS = "1.4.0"
-FONTS = "https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Spectral:wght@500;600;700&display=swap"
+FONTS = "https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Spectral:wght@600;700&display=swap"
 # Google Fonts picks the font format from the browser; this one gets woff2.
 BROWSER = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36"
 
