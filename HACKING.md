@@ -82,9 +82,12 @@ check now and then, for example before a new tournament:
   `fonts/fonts.css` to load them. Google Fonts has no versions to choose and
   updates its fonts now and then; running the script again takes whatever it
   serves now, and `git diff --stat` shows whether anything changed.
+- Noto Sans for the Lichess sample theme, the same way, in
+  `themes/lichess/fonts/`.
 
 Then run `python3 tools/vendor.py`, check the page and the demo (the fonts,
-and that games can still be stepped through), and commit `vendor/`.
+and that games can still be stepped through), and commit `vendor/` and
+`themes/lichess/fonts/`.
 
 ## Theming
 
