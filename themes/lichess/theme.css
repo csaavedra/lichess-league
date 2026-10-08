@@ -5,9 +5,9 @@
 
   This theme isn't made or endorsed by Lichess, and uses none of its logos or
   images: only its colours. Noto Sans is by the Noto Project Authors, under
-  the SIL Open Font License, and loaded here from Google Fonts.
+  the SIL Open Font License; fonts/ has a copy, made by tools/vendor.py.
 */
-@import url("https://fonts.googleapis.com/css2?family=Noto+Sans:wght@300;400;500;600;700&display=swap");
+@import url("fonts/fonts.css");
 
 :root {
   --page: hsl(37 10% 92%);
