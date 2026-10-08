@@ -4,15 +4,16 @@
     python3 tools/screenshots.py
 
 - screenshots/standings.png: the top of the halfway demo, title to the end
-  of the crosstable, 760px wide. The demo's title becomes "Club
+  of the crosstable, 920px wide. The demo's title becomes "Club
   Correspondence League" so it doesn't read "Demo: halfway".
 - screenshots/games.png: round 1 of the problems demo, from the Games
   heading to the end of the first row of cards, 680px wide, for the
   warnings under each board.
 
 Both are taken at twice the pixel density and shown 640px wide in the
-README. The widths are the narrowest at which all the crosstable's columns
-show, and three cards fit in a row, so the text stays readable at that size.
+README. The standings are the narrowest at which the title and the subtitle
+each fit on one line. The games are narrower, with three cards in a row:
+four need 1080px, and their warnings would be too small to read at 640px.
 
 It needs google-chrome (or CHROME pointing to another Chrome) and
 ImageMagick, and uses optipng if it's there. The pages come from
@@ -29,6 +30,8 @@ OUT = ROOT / "screenshots"
 CHROME = os.environ.get("CHROME", "google-chrome")
 SCALE = 2
 TITLE = "Club Correspondence League"
+STANDINGS_WIDTH = 920
+GAMES_WIDTH = 680
 
 # Where things are on the page once the games have loaded, in CSS pixels
 # from the top of the page.
@@ -94,13 +97,13 @@ def main():
         try:
             OUT.mkdir(exist_ok=True)
             url = f"{base}/halfway/index.html"
-            m = measure(url, 760)
+            m = measure(url, STANDINGS_WIDTH)
             # From the top of the page to just below the table, before its legend.
-            shoot(url, 760, 0, round(m["cross"][1]) + 8, OUT / "standings.png", tmp)
+            shoot(url, STANDINGS_WIDTH, 0, round(m["cross"][1]) + 8, OUT / "standings.png", tmp)
             url = f"{base}/problems/index.html"
-            m = measure(url, 680)
+            m = measure(url, GAMES_WIDTH)
             # From a little above the Games heading to just below the first row of cards.
-            shoot(url, 680, round(m["gamesH"][0]) - 14, round(m["card"][1]) + 10, OUT / "games.png", tmp)
+            shoot(url, GAMES_WIDTH, round(m["gamesH"][0]) - 14, round(m["card"][1]) + 10, OUT / "games.png", tmp)
         finally:
             server.shutdown()
 

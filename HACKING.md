@@ -103,8 +103,9 @@ Retake them after a change to how either looks:
 It needs Chrome and ImageMagick, and uses optipng if it's there. It takes
 the pages from `demo/serve.py --out`, so a private `theme/` never shows,
 renames the halfway demo to "Club Correspondence League", and captures each
-at twice the pixel density: the standings 760px wide and the games 680px
-wide, the narrowest widths with every column, and three cards in a row. The
+at twice the pixel density: the standings 920px wide, the narrowest with
+the title and the subtitle on one line each, and the games 680px wide, with
+three cards in a row (four need 1080px, too small to read in the README). The
 crops follow the page's headings, table and cards, so they keep the same
 framing when the layout changes. Look at both before committing them.
 
