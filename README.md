@@ -35,7 +35,7 @@ the page checks every game against the schedule and warns when:
 - the colours are reversed, or the players aren't the scheduled ones;
 - the game is unrated in a rated tournament, or the other way round;
 - the time control isn't the tournament's;
-- a game ID is wrong, or includes a player's private token (see below);
+- a game ID is wrong;
 - a player in the schedule is missing from the player list.
 
 <img src="screenshots/games.png" width="640" alt="A round with games that don't match the schedule">
@@ -59,11 +59,6 @@ the page checks every game against the schedule and warns when:
 The page re-reads `tournament.json` on every refresh, so editing that file
 is all it takes to keep the tournament up to date.
 
-> **Only ever paste the first 8 characters of a game ID.** A player who
-> copies the link from their own game gets a 12-character URL; the last 4
-> characters are a private token that lets anyone move for them. The page
-> warns about such IDs.
-
 ## The tournament file
 
 `tournament.json` holds everything about the tournament:
@@ -79,8 +74,9 @@ is all it takes to keep the tournament up to date.
   used for expected score and performance.
 - `rounds`: each round has a `name` and its `games`, as
   `{ "white": username, "black": username, "id": "" }`. Leave `id` empty
-  until the game exists; then put in its 8-character ID, or its link, like
-  `https://lichess.org/AbCd1234`.
+  until the game exists; then put in its 8-character ID, or any link to it,
+  like `https://lichess.org/AbCd1234`. A player's own link to the game has
+  4 more characters; those are fine too, the page only keeps the first 8.
 - `rated`: whether the games should be rated on Lichess (default `true`).
 - `timeControl`: the time control the games should have, either
   `{ "days": 3 }` (days per move) or `{ "minutes": 90, "increment": 30 }`

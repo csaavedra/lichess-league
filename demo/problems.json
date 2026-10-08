@@ -22,7 +22,7 @@
       { "white": "player4", "black": "player5", "id": "probR1G4", "demo": { "missing": true } }
     ] },
     { "name": "Round 2", "games": [
-      { "white": "player6", "black": "player4", "id": "probR2G1xY9z" },
+      { "white": "player6", "black": "player4", "id": "probR2G1" },
       { "white": "player5", "black": "player8", "id": "not-a-game" },
       { "white": "player9", "black": "player3", "id": "probR2G3" },
       { "white": "player1", "black": "player2", "id": "probR2G4", "demo": { "hoursAgo": 60 } }
