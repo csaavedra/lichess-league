@@ -474,8 +474,9 @@ test("parseConfig: players and rounds", () => {
   const c = parseConfig({
     players: [
       { username: "Alice", name: "A", seed: 1, seedRating: 2000, seedBasis: "Blitz" },
-      { username: "bob", seed: "2" },
+      { username: "bob ", seed: "2" },
       { name: "no username" },
+      { username: " " },
     ],
     rounds: [
       { name: "First", games: [{ white: " Alice ", black: "BOB", id: "https://lichess.org/AbCd1234" }] },
