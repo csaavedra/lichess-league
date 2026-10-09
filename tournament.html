@@ -268,6 +268,12 @@ table.pgames { border-collapse: collapse; width: 100%; font-size: 14.5px; font-v
 .pgames .num { text-align: right; }
 .sdlg td.opp { white-space: normal; }
 .sdlg td.opp small { font-weight: 500; }
+/* Clipped rather than scrolled, so that the header sticks to the top of the dialog. */
+.sdlg .table-scroll { overflow: clip; }
+.sdlg thead th { position: sticky; top: 0; background: var(--surface); }
+/* The player the seeding was opened for. An image over the row's own
+   background, which themes may stripe or colour on hover. */
+.sdlg .pgames tbody tr.at td { background-image: linear-gradient(var(--accent-soft), var(--accent-soft)); }
 .upcoming { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px 16px; font-size: 14px; color: var(--muted); }
 .upcoming b { color: var(--ink); font-weight: 600; }
 
@@ -370,7 +376,7 @@ const state = {
   open: null,           // game view: { id, positions, ply, back }
   player: null,         // player view: player id
   playerBack: false,    // the player view was opened from the seeding
-  seeding: false,       // seeding view
+  seeding: null,        // seeding view: { at }, the player it was opened for, if any
 };
 let roundSettled = false; // until the first fetch or a click, the round shown can still move to currentRound()
 
@@ -518,8 +524,8 @@ function renderStandings() {
   }
   // The seeds open the seeding: the header from the keyboard, any of them with a pointer.
   const seeded = rows.some((p) => seedOf(p.id) != null);
-  const seedBtn = (label, tab) => `<button type="button" class="seedbtn" data-seeding${tab ? "" : ' tabindex="-1"'} title="Show the seeding">${label}</button>`;
-  let html = `<thead><tr><th>#</th><th class="name">Player</th><th>${seeded ? seedBtn("Seed", true) : "Seed"}</th>`;
+  const seedBtn = (label, id) => `<button type="button" class="seedbtn" data-seeding="${esc(id || "")}"${id ? ' tabindex="-1"' : ""} title="Show the seeding">${label}</button>`;
+  let html = `<thead><tr><th>#</th><th class="name">Player</th><th>${seeded ? seedBtn("Seed") : "Seed"}</th>`;
   rows.forEach((_, i) => { html += `<th>${i + 1}</th>`; });
   html += '<th>Pts</th><th title="Wins against the players tied on points">TW</th><th title="Sonneborn–Berger">SB</th><th>Wins</th><th>Played</th></tr></thead><tbody>';
   rows.forEach((p) => {
@@ -529,7 +535,7 @@ function renderStandings() {
     const rating = cfgP?.seedRating != null ? `<span title="Seed rating${cfgP.seedBasis ? ` (${esc(cfgP.seedBasis)})` : ""}">${cfgP.seedRating}</span>` : "";
     const user = nm !== p.username ? esc(p.username) : "";
     const sub = user || rating ? `<small>${[user, rating].filter(Boolean).join(" · ")}</small>` : "";
-    html += `<tr><td class="rank">${p.rank}</td><td class="name"><button type="button" class="pname" data-player="${esc(p.id)}" aria-label="${esc(nm)}, show performance"><strong>${esc(nm)}</strong>${sub}</button></td><td class="minor">${seed != null ? seedBtn(seed) : ""}</td>`;
+    html += `<tr><td class="rank">${p.rank}</td><td class="name"><button type="button" class="pname" data-player="${esc(p.id)}" aria-label="${esc(nm)}, show performance"><strong>${esc(nm)}</strong>${sub}</button></td><td class="minor">${seed != null ? seedBtn(seed, p.id) : ""}</td>`;
     rows.forEach((o) => {
       if (o.id === p.id) { html += '<td class="res self"></td>'; return; }
       const list = p.cells.get(o.id) || [];
@@ -851,7 +857,7 @@ const signed = (n, digits = 0) => (n > 0 ? "+" : n < 0 ? "−" : "±") + Math.ab
 
 function openPlayer(pid, fromSeeding = false) {
   state.open = null;
-  state.seeding = false;
+  state.seeding = null;
   state.player = pid;
   state.playerBack = fromSeeding;
   renderPlayer();
@@ -951,17 +957,26 @@ function renderPlayer() {
 }
 
 // ---------- seeding ----------
-function openSeeding() {
+const seedingRow = (id) => document.querySelector(`#dlg tr[data-player="${CSS.escape(id)}"]`);
+
+// at: the player to show and highlight, when opened from their seed or
+// back from their view; from the Seed header, none.
+function openSeeding(at) {
   state.open = null;
   state.player = null;
-  state.seeding = true;
+  state.seeding = { at: at || null };
   renderSeeding();
   const d = document.getElementById("dlg");
   if (!d.open) d.showModal();
   d.scrollTop = 0;
+  const row = at && seedingRow(at);
+  if (row) { row.scrollIntoView({ block: "center" }); row.focus({ preventScroll: true }); }
 }
 
 function renderSeeding() {
+  const d = document.getElementById("dlg");
+  // A refresh redraws the rows: keep the focus on the one that had it.
+  const focused = d.contains(document.activeElement) ? document.activeElement.closest("tr[data-player]")?.dataset.player : null;
   const table = standings();
   const list = seedingOrder(config.roster, table);
   // Until a game is finished the standings are only the seeds again.
@@ -969,7 +984,7 @@ function renderSeeding() {
   const rowsHTML = list.map((p) => {
     const nm = p.name || p.username;
     const moved = p.moved ? `, <span class="${trend(p.moved)}">${p.moved > 0 ? "up" : "down"} ${Math.abs(p.moved)}</span>` : "";
-    return `<tr tabindex="0" data-player="${esc(p.id)}">
+    return `<tr tabindex="0" data-player="${esc(p.id)}"${p.id === state.seeding.at ? ' class="at"' : ""}>
       <td class="num">${p.seed}</td>
       <td class="opp">${esc(nm)}${nm !== p.username ? `<small>${esc(p.username)}</small>` : ""}</td>
       <td class="num">${p.seedRating ?? "—"}${p.seedBasis ? `<small>${esc(p.seedBasis)}</small>` : ""}</td>
@@ -977,7 +992,6 @@ function renderSeeding() {
     </tr>`;
   }).join("");
 
-  const d = document.getElementById("dlg");
   d.innerHTML = `<div class="dlg pdlg sdlg">
     <div class="head">
       <div>
@@ -991,6 +1005,7 @@ function renderSeeding() {
       <tbody>${rowsHTML}</tbody></table></div>
     <p class="facts fine">Seed ratings are each player's fixed rating for the tournament, taken from the Lichess rating named under it. Performance and expected score use them. The seed is the last tiebreak in the standings.${started ? " Now is the place in the standings, up or down from the seed." : ""}</p>
   </div>`;
+  if (focused) seedingRow(focused)?.focus({ preventScroll: true });
 }
 
 // ---------- events ----------
@@ -1003,7 +1018,7 @@ document.getElementById("tabs").addEventListener("click", (e) => {
 });
 document.getElementById("cross").addEventListener("click", (e) => {
   const s = e.target.closest("button[data-seeding]");
-  if (s) return openSeeding();
+  if (s) return openSeeding(s.dataset.seeding);
   const b = e.target.closest("button[data-player]");
   if (b) openPlayer(b.dataset.player);
 });
@@ -1042,7 +1057,7 @@ dlg.addEventListener("click", (e) => {
   switch (b.dataset.act) {
     case "close": dlg.close(); break;
     case "back": openPlayer(o.back, state.playerBack); break;
-    case "seeding": openSeeding(); break;
+    case "seeding": openSeeding(state.player); break;
     case "first": step(0); break;
     case "prev": step(o.ply - 1); break;
     case "next": step(o.ply + 1); break;
@@ -1078,7 +1093,7 @@ dlg.addEventListener("wheel", (e) => {
     step(o.ply + dir);
   }
 }, { passive: false });
-dlg.addEventListener("close", () => { state.open = null; state.player = null; state.playerBack = false; state.seeding = false; });
+dlg.addEventListener("close", () => { state.open = null; state.player = null; state.playerBack = false; state.seeding = null; });
 document.getElementById("refresh").addEventListener("click", () => refresh(true));
 
 // ---------- refresh loop ----------
