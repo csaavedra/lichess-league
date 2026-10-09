@@ -29,6 +29,10 @@
   --last: rgba(155, 199, 0, 0.41);
   --clock: #d64f00;
   --brag: hsl(37 74% 48%);
+  --metal-top: hsl(0 0% 96%);
+  --metal-bottom: hsl(0 0% 93%);
+  --metal-top-hover: hsl(0 0% 98%);
+  --metal-bottom-hover: hsl(0 0% 95%);
   --shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.08), 0 3px 1px -2px rgba(0, 0, 0, 0.18), 0 1px 5px 0 rgba(0, 0, 0, 0.1);
   --font-display: "Noto Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-text: var(--font-display);
@@ -52,6 +56,10 @@
     --warn: hsl(0 60% 58%);
     --warn-soft: hsl(0 60% 50% / 0.15);
     --brag: hsl(37 74% 43%);
+    --metal-top: hsl(37 7% 22%);
+    --metal-bottom: hsl(37 5% 19%);
+    --metal-top-hover: hsl(37 7% 25%);
+    --metal-bottom-hover: hsl(37 5% 22%);
   }
 }
 
@@ -128,6 +136,17 @@ button:not(.cross button, [aria-disabled="true"]):hover, .tabs button:hover { co
 .tabs button[aria-selected="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
 .status a, .dlg a { text-decoration: none; }
 .status a:hover, .dlg a:hover { text-decoration: underline; }
+
+/* Refresh, Close and Back as Lichess's metal buttons: no border, a
+   gradient that lightens on hover, and the text colour kept. */
+:is(#refresh, .dlg .head .actions button) {
+  border: 0; background: linear-gradient(to bottom, var(--metal-top), var(--metal-bottom));
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.2);
+}
+:is(#refresh, .dlg .head .actions button):hover {
+  background: linear-gradient(to bottom, var(--metal-top-hover), var(--metal-bottom-hover));
+  box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.24); color: var(--ink);
+}
 
 /* The game view: thin scrollbars, and the move buttons in one flat strip
    that turns green on hover. */
