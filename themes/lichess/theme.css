@@ -28,6 +28,7 @@
   --sq-dark: #b58863;
   --last: rgba(155, 199, 0, 0.41);
   --clock: #d64f00;
+  --brag: hsl(37 74% 48%);
   --shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.08), 0 3px 1px -2px rgba(0, 0, 0, 0.18), 0 1px 5px 0 rgba(0, 0, 0, 0.1);
   --font-display: "Noto Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-text: var(--font-display);
@@ -50,6 +51,7 @@
     --accent-soft: hsl(209 79% 56% / 0.25);
     --warn: hsl(0 60% 58%);
     --warn-soft: hsl(0 60% 50% / 0.15);
+    --brag: hsl(37 74% 43%);
   }
 }
 
@@ -74,10 +76,10 @@ h2 { font-size: 20px; }
   background-image: linear-gradient(to left, color-mix(in oklab, var(--accent) 70%, var(--surface)) 5px, transparent 5px);
 }
 
-/* Results as in Lichess's Swiss standings, wins green, draws grey and
+/* Results as in Lichess's Swiss standings, wins green, draws amber and
    losses red, and rating changes in the same green and red. */
 :is(.cross td.res, .pgames td.r, .tile .v) .w, .tile .v.up, .pgames .up, .side .up { color: var(--live); }
-:is(.cross td.res, .pgames td.r, .tile .v) .d { color: var(--muted); }
+:is(.cross td.res, .pgames td.r, .tile .v) .d { color: color-mix(in oklab, var(--brag) 70%, var(--surface)); }
 :is(.cross td.res, .pgames td.r, .tile .v) .l, .tile .v.down, .pgames .down, .side .down {
   color: color-mix(in oklab, var(--warn) 60%, var(--surface)); font-weight: inherit;
 }
