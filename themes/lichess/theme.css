@@ -29,6 +29,7 @@
   --last: rgba(155, 199, 0, 0.41);
   --clock: #d64f00;
   --brag: hsl(37 74% 48%);
+  --tab: hsl(22 100% 42%);
   --metal-top: hsl(0 0% 96%);
   --metal-bottom: hsl(0 0% 93%);
   --metal-top-hover: hsl(0 0% 98%);
@@ -130,12 +131,26 @@ h2 { font-size: 20px; }
 .game .status { padding: 6px 8px 8px; }
 .game .status + .status { padding-top: 0; }
 
-/* Blue for hovered buttons, the selected round and links. The standings
-   light up instead. */
-button:not(.cross button, [aria-disabled="true"]):hover, .tabs button:hover { color: var(--accent); border-color: var(--accent); }
-.tabs button[aria-selected="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+/* Blue for hovered buttons and links. The standings and the rounds have
+   their own. */
+button:not(.cross button, .tabs button, [aria-disabled="true"]):hover { color: var(--accent); border-color: var(--accent); }
 .status a, .dlg a { text-decoration: none; }
 .status a:hover, .dlg a:hover { text-decoration: underline; }
+
+/* The rounds as Lichess's tabs: plain text over a line that shows on
+   hover and marks the selected round in orange. Finished rounds keep
+   their tick in green, live ones their green dot. */
+.tabs { gap: 0; }
+.tabs button,
+.tabs button:is([data-state], [aria-selected="true"]) {
+  flex: 1 1 auto; padding: 0.5em 0.6em; border: 0; border-bottom: 2px solid transparent;
+  border-radius: 0; background: transparent; color: var(--ink); font-weight: 400;
+}
+.tabs button[data-state="upcoming"], .tabs button[data-state="done"] { color: var(--muted); }
+.tabs button[data-state="done"] .count { color: var(--live); }
+.tabs button:hover { border-bottom-color: hsl(from var(--tab) h s l / 0.5); }
+.tabs button[aria-selected="true"], .tabs button[aria-selected="true"]:hover { color: var(--tab); border-bottom-color: var(--tab); }
+.tabs [aria-selected="true"] .pulse { background: var(--live); }
 
 /* Refresh, Close and Back as Lichess's metal buttons: no border, a
    gradient that lightens on hover, and the text colour kept. */
@@ -155,4 +170,8 @@ button:not(.cross button, [aria-disabled="true"]):hover, .tabs button:hover { co
 .dlg .controls button { flex: 1; height: 2.5rem; border: 0; border-radius: 0; background: transparent; }
 .dlg .controls button:hover:not([aria-disabled="true"]) {
   background: color-mix(in oklab, var(--live) 75%, var(--surface)); color: #fff;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tabs button { transition: color 0.25s, border-color 0.25s; }
 }
