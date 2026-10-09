@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   START_FEN, DAY_MS, fmtPts, plural, deadlineOf, fmtLeft, extractId, summarize,
-  computeStandings, scheduleMismatch, ratedMismatch, playerGames, playerStats,
+  computeStandings, seedingOrder, scheduleMismatch, ratedMismatch, playerGames, playerStats,
   parseTimeControl, gameTimeControl, fmtTimeControl, timeControlMismatch, challengeUrl,
   parseFormat, endOf, tournamentSpan, fmtSpan, gameDates, subtitleText, refreshSeconds, parseConfig,
   scoreOf, ordinal, roundStats, roundState, currentRound, boardSquares, pieceMoves, gameCache,
@@ -146,6 +146,16 @@ test("unscheduled players still appear, anonymous ones don't", () => {
   const rows = standings(players, [game("a", "x", "0-1"), anon]);
   assert.deepEqual(rows.map((r) => r.id), ["x", "a"]);
   assert.equal(byId(rows).a.username, "A"); // capitalisation from Lichess
+});
+
+test("seeding lists the seeded players in seed order with their move since", () => {
+  const players = playersMap([["c", 3, 1700], ["a", 1, 1900], ["x", null], ["b", 2, 1800]]);
+  const rows = seedingOrder(players, standings(players, [game("c", "a", "1-0")]));
+  assert.deepEqual(rows.map((p) => [p.id, p.seed, p.seedRating, p.rank, p.moved]), [
+    ["a", 1, 1900, 2, -1], // a and b tie on everything but seed
+    ["b", 2, 1800, 3, -1],
+    ["c", 3, 1700, 1, 2],
+  ]);
 });
 
 test("performance and expected score from seed ratings", () => {
