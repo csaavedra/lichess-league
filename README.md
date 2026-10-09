@@ -44,7 +44,7 @@ the page checks every game against the schedule and warns when:
 
 1. Decide the players and the pairings. The page doesn't make pairings:
    you bring the schedule. For a round-robin, the standard Berger tables
-   are a good choice, and sites like Challonge can generate them.
+   are a good choice, or a site like Challonge can make one for you.
 2. Write them in `tournament.json`, starting from `tournament.example.json`
    (described below).
 3. Put the page online (see [Publishing](#publishing)) and share the link

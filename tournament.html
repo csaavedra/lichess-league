@@ -479,7 +479,7 @@ const nameOf = (id) => config.roster.get(id)?.name || config.roster.get(id)?.use
 
 const standings = () => computeStandings(config.rounds, state.games, config.roster, config.scoring);
 // Each player's rank, from the last standings rendered: the games and the
-// dialog show it next to the names, as Lichess does in its tournaments.
+// dialog show it next to the names.
 let ranks = new Map();
 function rankHTML(id) {
   const r = ranks.get(id);

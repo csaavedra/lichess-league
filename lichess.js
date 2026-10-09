@@ -6,10 +6,10 @@ import { gameCache } from "./lib.js";
 // A 429: the caller should back off before asking again.
 const rateError = () => Object.assign(new Error("rate"), { rate: true });
 
-// One game at a time through the single-game export. The bulk endpoint
-// (/api/games/export/_ids) allows only 2 concurrent requests per IP address,
-// and Lichess can keep that slot taken long after a request ends, which
-// blocks the page for everyone on the same network.
+// One game at a time through the single-game export, as the API docs ask
+// for one request at a time. The bulk endpoint (/api/games/export/_ids)
+// allows only 2 concurrent requests per IP address, shared with everyone
+// else on the same network.
 const EXPORT_PARAMS = "moves=true&lastFen=true&opening=true&evals=false&clocks=false&accuracy=false&literate=false";
 
 // The game as Lichess exports it, or null when Lichess doesn't know it.
@@ -21,15 +21,17 @@ export async function fetchGame(id) {
   return res.json();
 }
 
-// The export API leaves out the last few moves of games in progress (an
-// anti-cheat delay), although lastFen is current. The game stream has the
-// full history, so read it until it reaches the exported position, then stop.
+// The export leaves out the last 3 moves of games in progress (an anti-cheat
+// delay), although lastFen is current. The game stream only has that delay
+// for games with a clock, so for correspondence games read it until it
+// reaches the exported position, then stop.
 const STREAM_TIMEOUT_MS = 15000;
 const fenKey = (fen) => String(fen || "").split(" ").slice(0, 2).join(" ");
 
 // g: a summary from lib.js. Returns the stream's positions, [{ fen, lm }]
 // from the start to g's position, or null if the stream didn't get there.
 export async function fetchHistory(g) {
+  if (g.clock) return null; // the stream is 3 moves behind too
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), STREAM_TIMEOUT_MS);
   const target = fenKey(g.fen);

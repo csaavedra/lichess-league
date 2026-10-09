@@ -59,6 +59,12 @@ test("fetchHistory gives up when the stream ends before the position", async () 
   assert.equal(await fetchHistory({ id: "AbCd1234", fen: E5, lastUci: "e7e5" }), null);
 });
 
+test("fetchHistory skips games with a clock", async () => {
+  const urls = fakeFetch(200, stream([GAME, { fen: START }, { fen: E4, lm: "e2e4" }]));
+  assert.equal(await fetchHistory({ id: "AbCd1234", fen: E4, lastUci: "e2e4", clock: { minutes: 10, increment: 5 } }), null);
+  assert.deepEqual(urls, []);
+});
+
 test("fetchHistory: nothing on an error, a rate error on a 429", async () => {
   const g = { id: "AbCd1234", fen: E5, lastUci: "e7e5" };
   for (const status of [404, 500]) {

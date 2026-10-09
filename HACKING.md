@@ -33,9 +33,11 @@ the files as ES modules; there is nothing to install):
 
 - Games are fetched one at a time from `/game/export/{id}`. On a 429 the page
   backs off for two minutes.
-- Lichess leaves the last few moves out of the export while a game is in
-  progress, so the page reads the full move list from the game stream when a
-  position changes.
+- Lichess leaves the last 3 moves out of the export while a game is in
+  progress. For correspondence games the page reads the full move list from
+  the game stream when a position changes. Games with a clock get the same
+  delay on the stream, so their move list stays 3 moves behind until they
+  end.
 - Finished games are cached in `localStorage` and never fetched again.
 - [chess.js](https://github.com/jhlywa/chess.js), copied in `vendor/`, is
   loaded only to replay moves. If it fails to load, the standings and boards
