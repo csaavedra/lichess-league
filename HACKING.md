@@ -32,7 +32,8 @@ the files as ES modules; there is nothing to install):
 ## How it talks to Lichess
 
 - Games are fetched one at a time from `/game/export/{id}`. On a 429 the page
-  backs off for two minutes.
+  backs off for two minutes. Any other error skips that game until the next
+  refresh.
 - Lichess leaves the last 3 moves out of the export while a game is in
   progress. For correspondence games the page reads the full move list from
   the game stream when a position changes. Games with a clock get the same
