@@ -29,6 +29,20 @@ the files as ES modules; there is nothing to install):
 
     node --test
 
+## Formatting
+
+The JavaScript is in [Prettier](https://prettier.io)'s default style, the
+most common one for JS; there is no configuration file to keep. After editing
+`lib.js`, `lichess.js`, the tests, the demo's mock or the page's inline
+script, run
+
+    python3 tools/format.py
+
+which needs `npx`, and formats the `.js` files and the script inside
+`tournament.html` (Prettier alone would reformat the page's markup and CSS
+too). `--check` only reports what isn't formatted. `vendor/` is left as
+copied.
+
 ## How it talks to Lichess
 
 - Games are fetched one at a time from `/game/export/{id}`. On a 429 the page

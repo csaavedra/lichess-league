@@ -21,19 +21,23 @@
 
 import { gameCache, parseConfig } from "./lib.js";
 
-const HOUR = 3600000, DAY = 24 * HOUR, now = Date.now();
+const HOUR = 3600000,
+  DAY = 24 * HOUR,
+  now = Date.now();
 const fetches = new Map(); // id -> times the page fetched the game
 
 // Read on the first request, so that loading this module does nothing.
 let setup = null;
-const load = () => (setup ??= (async () => {
-  const cfg = await (await fetch("tournament.json")).json();
-  return {
-    cfg, parsed: parseConfig(cfg),
-    Chess: (await import("./vendor/chess.js")).Chess,
-    growing: new URLSearchParams(location.search).has("moves"),
-  };
-})());
+const load = () =>
+  (setup ??= (async () => {
+    const cfg = await (await fetch("tournament.json")).json();
+    return {
+      cfg,
+      parsed: parseConfig(cfg),
+      Chess: (await import("./vendor/chess.js")).Chess,
+      growing: new URLSearchParams(location.search).has("moves"),
+    };
+  })());
 
 // A small seeded generator, so a scenario looks the same on every load.
 function rng(seed) {
@@ -67,9 +71,14 @@ export async function fetchGame(id) {
   const rand = rng(id);
   const result = d.result || "live";
   const finished = !["live", "new"].includes(result);
-  const plies = d.plies ?? (result === "new" || result === "aborted" ? 0
-    : finished ? 40 + Math.floor(rand() * 50) : 10 + Math.floor(rand() * 40));
-  const extra = growing && result === "live" ? fetches.get(id) ?? 0 : 0;
+  const plies =
+    d.plies ??
+    (result === "new" || result === "aborted"
+      ? 0
+      : finished
+        ? 40 + Math.floor(rand() * 50)
+        : 10 + Math.floor(rand() * 40));
+  const extra = growing && result === "live" ? (fetches.get(id) ?? 0) : 0;
   fetches.set(id, extra + 1);
 
   const c = new Chess();
@@ -79,26 +88,55 @@ export async function fetchGame(id) {
   }
   const last = c.history({ verbose: true }).at(-1);
 
-  let status = "started", winner;
+  let status = "started",
+    winner;
   if (result === "aborted") status = "aborted";
   else if (finished) {
     winner = { "1-0": "white", "0-1": "black" }[result];
     status = d.status || (winner ? "resign" : "draw");
   }
 
-  let white = d.white || slot.white, black = d.black || slot.black;
+  let white = d.white || slot.white,
+    black = d.black || slot.black;
   if (d.swapColours) [white, black] = [black, white];
   const rated = d.rated ?? parsed.rated;
   const seed = (u) => parsed.roster.get(u.toLowerCase())?.seedRating ?? 1500;
-  const diff = (color) => (!rated || !finished || status === "aborted" ? undefined : !winner ? 0 : winner === color ? 9 : -9);
-  const side = (u, color) => ({ user: { id: u.toLowerCase(), name: u }, rating: seed(u), ratingDiff: diff(color) });
+  const diff = (color) =>
+    !rated || !finished || status === "aborted"
+      ? undefined
+      : !winner
+        ? 0
+        : winner === color
+          ? 9
+          : -9;
+  const side = (u, color) => ({
+    user: { id: u.toLowerCase(), name: u },
+    rating: seed(u),
+    ratingDiff: diff(color),
+  });
 
-  const clock = d.clock && { initial: d.clock.minutes * 60, increment: d.clock.increment ?? 0 };
-  const daysPerTurn = clock ? undefined : d.daysPerTurn ?? 3;
+  const clock = d.clock && {
+    initial: d.clock.minutes * 60,
+    increment: d.clock.increment ?? 0,
+  };
+  const daysPerTurn = clock ? undefined : (d.daysPerTurn ?? 3);
   const createdAt = now - (parsed.rounds.length + 1 - r) * 10 * DAY;
-  const lastMoveAt = finished ? createdAt + 8 * DAY : extra ? Date.now() : plies ? now - (d.hoursAgo ?? rand() * 30) * HOUR : undefined;
+  const lastMoveAt = finished
+    ? createdAt + 8 * DAY
+    : extra
+      ? Date.now()
+      : plies
+        ? now - (d.hoursAgo ?? rand() * 30) * HOUR
+        : undefined;
   return {
-    id, rated, status, winner, daysPerTurn, clock, createdAt, lastMoveAt,
+    id,
+    rated,
+    status,
+    winner,
+    daysPerTurn,
+    clock,
+    createdAt,
+    lastMoveAt,
     players: { white: side(white, "white"), black: side(black, "black") },
     moves: c.history().join(" "),
     lastFen: c.fen(),
