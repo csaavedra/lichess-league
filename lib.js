@@ -4,6 +4,9 @@
 
 export const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 const ONGOING = new Set(["created", "started"]);
+// Lichess gives a noStart game to the opponent of the player who never moved,
+// but here a game that never started doesn't count. Challenge games end as
+// aborted instead.
 const VOID = new Set(["aborted", "noStart"]);
 const DEFAULT_SCORING = { win: 1, draw: 0.5, loss: 0 };
 
