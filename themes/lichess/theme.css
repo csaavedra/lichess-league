@@ -67,6 +67,12 @@ h2 { font-size: 20px; }
 .pgames tbody tr:nth-child(even) td { background: var(--zebra); }
 .cross th, .cross td, .pgames th, .pgames td { border-bottom-color: transparent; }
 .pgames tbody tr:hover td { background: var(--self); }
+/* The player the seeding was opened for, as Lichess marks the selected
+   player in its standings: a stripe at the right edge of the row. */
+.sdlg .pgames tbody tr.at td { background-image: none; }
+.sdlg .pgames tbody tr.at td:last-child {
+  background-image: linear-gradient(to left, color-mix(in oklab, var(--accent) 70%, var(--surface)) 5px, transparent 5px);
+}
 
 /* Results as in Lichess's Swiss standings, wins green, draws grey and
    losses red, and rating changes in the same green and red. */
