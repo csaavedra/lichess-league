@@ -13,7 +13,10 @@ test("the demo's lichess.js exports the same names as the real one", async () =>
   const dir = mkdtempSync(join(tmpdir(), "lichess-league-demo-"));
   try {
     copyFileSync(new URL("../lib.js", import.meta.url), join(dir, "lib.js"));
-    copyFileSync(new URL("../demo/mock.js", import.meta.url), join(dir, "lichess.js"));
+    copyFileSync(
+      new URL("../demo/mock.js", import.meta.url),
+      join(dir, "lichess.js"),
+    );
     writeFileSync(join(dir, "package.json"), '{ "type": "module" }');
     const fake = await import(pathToFileURL(join(dir, "lichess.js")));
     const real = await import("../lichess.js");

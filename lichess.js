@@ -10,11 +10,15 @@ const rateError = () => Object.assign(new Error("rate"), { rate: true });
 // for one request at a time. The bulk endpoint (/api/games/export/_ids)
 // allows only 2 concurrent requests per IP address, shared with everyone
 // else on the same network.
-const EXPORT_PARAMS = "moves=true&lastFen=true&opening=true&evals=false&clocks=false&accuracy=false&literate=false";
+const EXPORT_PARAMS =
+  "moves=true&lastFen=true&opening=true&evals=false&clocks=false&accuracy=false&literate=false";
 
 // The game as Lichess exports it, or null when Lichess doesn't know it.
 export async function fetchGame(id) {
-  const res = await fetch(`https://lichess.org/game/export/${id}?${EXPORT_PARAMS}`, { headers: { Accept: "application/json" } });
+  const res = await fetch(
+    `https://lichess.org/game/export/${id}?${EXPORT_PARAMS}`,
+    { headers: { Accept: "application/json" } },
+  );
   if (res.status === 404) return null;
   if (res.status === 429) throw rateError();
   if (!res.ok) throw new Error(`Lichess answered with status ${res.status}.`);
@@ -26,7 +30,11 @@ export async function fetchGame(id) {
 // for games with a clock, so for correspondence games read it until it
 // reaches the exported position, then stop.
 const STREAM_TIMEOUT_MS = 15000;
-const fenKey = (fen) => String(fen || "").split(" ").slice(0, 2).join(" ");
+const fenKey = (fen) =>
+  String(fen || "")
+    .split(" ")
+    .slice(0, 2)
+    .join(" ");
 
 // g: a summary from lib.js. Returns the stream's positions, [{ fen, lm }]
 // from the start to g's position, or null if the stream didn't get there.
@@ -37,7 +45,10 @@ export async function fetchHistory(g) {
   const target = fenKey(g.fen);
   const list = [];
   try {
-    const res = await fetch(`https://lichess.org/api/stream/game/${g.id}`, { signal: ctrl.signal, headers: { Accept: "application/x-ndjson" } });
+    const res = await fetch(`https://lichess.org/api/stream/game/${g.id}`, {
+      signal: ctrl.signal,
+      headers: { Accept: "application/x-ndjson" },
+    });
     if (res.status === 429) throw rateError();
     if (!res.ok || !res.body) return null;
     const reader = res.body.getReader();
@@ -55,7 +66,8 @@ export async function fetchHistory(g) {
         const msg = JSON.parse(line);
         if (!msg.fen || msg.id) continue; // the first line is the game itself
         list.push(msg);
-        if (fenKey(msg.fen) === target && (msg.lm || null) === g.lastUci) break read;
+        if (fenKey(msg.fen) === target && (msg.lm || null) === g.lastUci)
+          break read;
       }
     }
   } catch (err) {
@@ -71,5 +83,14 @@ export async function fetchHistory(g) {
 
 // Finished games are kept in this browser's localStorage, which is missing
 // or throws when the browser blocks storage. gameCache() is in lib.js.
-const storage = (() => { try { return globalThis.localStorage; } catch { return undefined; } })();
-export const { finishedGame, cacheFinished } = gameCache(storage, "tournament:finished-games:v3");
+const storage = (() => {
+  try {
+    return globalThis.localStorage;
+  } catch {
+    return undefined;
+  }
+})();
+export const { finishedGame, cacheFinished } = gameCache(
+  storage,
+  "tournament:finished-games:v3",
+);
