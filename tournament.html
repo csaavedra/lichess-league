@@ -340,9 +340,11 @@ footer a { color: inherit; text-underline-offset: 2px; }
 
   <section aria-labelledby="games-h">
     <h2 id="games-h">Games</h2>
-    <div class="tabs" role="tablist" id="tabs"></div>
-    <p class="round-meta" id="round-meta"></p>
-    <div class="games" id="games"></div>
+    <div class="tabs" role="tablist" aria-labelledby="games-h" id="tabs"></div>
+    <div role="tabpanel" id="round">
+      <p class="round-meta" id="round-meta"></p>
+      <div class="games" id="games"></div>
+    </div>
   </section>
 
   <footer>This page shows positions and moves only. There is no engine or evaluation anywhere on it, by design. Game data comes from Lichess and refreshes automatically. Made with <a href="https://github.com/csaavedra/lichess-league">lichess-league</a>.</footer>
@@ -578,8 +580,11 @@ function scheduleNotice() {
 
 const ROUND_LABELS = { upcoming: "not started", live: "in progress", done: "finished" };
 
+// One tab per round, all controlling the same panel. Only the selected tab
+// is in the tab order; the arrow keys move between them.
 function renderTabs() {
   const el = document.getElementById("tabs");
+  const hadFocus = el.contains(document.activeElement);
   el.innerHTML = config.rounds.map((r, i) => {
     const st = roundStats(r, state.games);
     const kind = roundState(st);
@@ -587,8 +592,11 @@ function renderTabs() {
     const lead = kind === "live" ? '<span class="pulse" aria-hidden="true"></span>' : "";
     const count = kind === "live" ? `<span class="count">${st.done}/${st.total}</span>`
       : kind === "done" ? '<span class="count" aria-hidden="true">✓</span>' : "";
-    return `<button type="button" role="tab" aria-selected="${i === state.round}" data-r="${i}" data-state="${kind}" title="${label}">${lead}${esc(r.name)}${count}<span class="vh">, ${label}</span></button>`;
+    const sel = i === state.round;
+    return `<button type="button" role="tab" id="tab-${i}" aria-controls="round" aria-selected="${sel}" tabindex="${sel ? 0 : -1}" data-r="${i}" data-state="${kind}" title="${label}">${lead}${esc(r.name)}${count}<span class="vh">, ${label}</span></button>`;
   }).join("");
+  document.getElementById("round").setAttribute("aria-labelledby", `tab-${state.round}`);
+  if (hadFocus) document.getElementById(`tab-${state.round}`)?.focus();
 }
 
 // The export gives each player's rating at the start of the game, and once a
@@ -1015,12 +1023,21 @@ function renderSeeding() {
 }
 
 // ---------- events ----------
-document.getElementById("tabs").addEventListener("click", (e) => {
-  const b = e.target.closest("button[data-r]");
-  if (!b) return;
-  state.round = +b.dataset.r;
+function selectRound(i) {
+  state.round = i;
   roundSettled = true;
   renderTabs(); renderGames();
+}
+document.getElementById("tabs").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-r]");
+  if (b) selectRound(+b.dataset.r);
+});
+document.getElementById("tabs").addEventListener("keydown", (e) => {
+  const n = config.rounds.length;
+  const to = { ArrowLeft: state.round - 1, ArrowRight: state.round + 1, Home: 0, End: n - 1 }[e.key];
+  if (to === undefined || !n) return;
+  e.preventDefault();
+  selectRound((to + n) % n);
 });
 document.getElementById("cross").addEventListener("click", (e) => {
   const s = e.target.closest("button[data-seeding]");
