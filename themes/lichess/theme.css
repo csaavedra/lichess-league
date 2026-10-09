@@ -89,6 +89,22 @@ h2 { font-size: 20px; }
 .cross td.rank, .cross td.minor { font-weight: 300; }
 .cross tbody tr:first-child td.pts { color: inherit; }
 
+/* Hovering the standings lights up the row, and a result fills its cell
+   in its own colour, as in Lichess's Swiss standings. Nothing is
+   underlined, and draws don't light up. */
+.cross tbody tr:hover td:not(.self) { background: color-mix(in oklab, var(--accent) 15%, var(--surface)); }
+.cross :is(.pname:hover strong, .seedbtn:hover, .resbtn:hover span) { text-decoration: none; }
+.cross thead .seedbtn:hover { color: var(--accent); }
+.cross td.res { height: 1px; padding: 0; }
+.cross td.res .resbtn {
+  box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center;
+  height: 100%; min-width: 50%; border-radius: 0;
+}
+.cross td.res .resbtn:only-child { width: 100%; }
+.cross td.res .resbtn:hover:has(.w) { background: color-mix(in oklab, var(--live) 35%, var(--surface)); }
+.cross td.res .resbtn:hover:has(.l) { background: color-mix(in oklab, var(--warn) 20%, var(--surface)); }
+.cross td.res .resbtn:hover:has(.live) { background: color-mix(in oklab, var(--accent) 35%, var(--surface)); }
+
 /* Game cards as the boards of a Lichess Swiss tournament: the board fills
    the card, between two thin player lines with the rank in bold and the
    name in regular weight, the rating light and a little smaller, in the
@@ -106,8 +122,9 @@ h2 { font-size: 20px; }
 .game .status { padding: 6px 8px 8px; }
 .game .status + .status { padding-top: 0; }
 
-/* Blue for hovered buttons, the selected round and links. */
-button:not([aria-disabled="true"]):hover, .tabs button:hover { color: var(--accent); border-color: var(--accent); }
+/* Blue for hovered buttons, the selected round and links. The standings
+   light up instead. */
+button:not(.cross button, [aria-disabled="true"]):hover, .tabs button:hover { color: var(--accent); border-color: var(--accent); }
 .tabs button[aria-selected="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
 .status a, .dlg a { text-decoration: none; }
 .status a:hover, .dlg a:hover { text-decoration: underline; }
