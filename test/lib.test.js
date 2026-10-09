@@ -223,19 +223,16 @@ test("SB leaves out games in progress", () => {
     ["b", 2],
     ["c", 3],
   ]);
+  const live = game("a", "c", "live");
   const p = byId(
-    standings(players, [
-      game("a", "b", "1-0"),
-      game("c", "b", "1-0"),
-      game("a", "c", "live"),
-    ]),
+    standings(players, [game("a", "b", "1-0"), game("c", "b", "1-0"), live]),
   );
   assert.equal(p.a.pts, 1);
   assert.equal(p.c.pts, 1);
   assert.equal(p.a.sb, 0);
   assert.equal(p.c.sb, 0);
   assert.equal(p.a.played, 1);
-  assert.deepEqual(p.a.cells.get("c"), [{ live: true }]);
+  assert.deepEqual(p.a.cells.get("c"), [{ id: live.id, live: true }]);
 });
 
 test("aborted games are ignored", () => {
