@@ -114,6 +114,9 @@ table.cross { border-collapse: collapse; width: 100%; font-variant-numeric: tabu
 .cross td.pts { font: 700 19px/1 var(--font-display); width: 64px; }
 .cross td.minor { color: var(--muted); width: 56px; font-size: 14px; }
 .cross tbody tr:first-child td.pts { color: var(--accent); }
+.cross :is(.pname, .seedbtn) { all: unset; cursor: pointer; border-radius: 3px; }
+.cross .pname { display: block; }
+.cross :is(.pname:hover strong, .seedbtn:hover) { text-decoration: underline; text-underline-offset: 3px; }
 .legend { color: var(--muted); font-size: 13px; margin: 8px 2px 0; }
 
 /* Round tabs */
@@ -236,9 +239,6 @@ dialog::backdrop { background: rgba(10, 14, 12, 0.6); }
 .dlg .head .actions { display: flex; gap: 6px; flex: none; }
 
 /* Player view */
-.cross :is(.pname, .seedbtn) { all: unset; cursor: pointer; border-radius: 3px; }
-.cross .pname { display: block; }
-.cross :is(.pname:hover strong, .seedbtn:hover) { text-decoration: underline; text-underline-offset: 3px; }
 .dlg.pdlg { grid-template-columns: minmax(0, 1fr); gap: 20px; }
 .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 .tile { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; }
