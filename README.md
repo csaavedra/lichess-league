@@ -23,6 +23,8 @@ To see it with made-up games, open the
 - A move-by-move view of each game.
 - Each player's tournament: their games, performance, score against
   expectation and, in a rated tournament, the rating they gained or lost.
+- The seeding, with each player's seed rating, the rating it came from and
+  how far they are from their seed.
 - For each game not started yet, a link for White to send the challenge.
 
 Game data comes from Lichess and the page refreshes it every few minutes,
