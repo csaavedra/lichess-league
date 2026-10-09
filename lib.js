@@ -183,6 +183,16 @@ export function computeStandings(rounds, games, players, sc = DEFAULT_SCORING) {
   return list;
 }
 
+// players: the roster, table: computeStandings(), which has every player in
+// the roster. The seeded players in seed order, each with its rank now and the
+// places gained (negative if lost).
+export function seedingOrder(players, table) {
+  const rank = new Map(table.map((p) => [p.id, p.rank]));
+  return [...players].filter(([, p]) => p.seed != null)
+    .sort(([, a], [, b]) => a.seed - b.seed)
+    .map(([id, p]) => ({ id, ...p, rank: rank.get(id), moved: p.seed - rank.get(id) }));
+}
+
 // ---------- rounds ----------
 // r: a round from parseConfig(), games: Map id -> summary. An aborted game counts as done.
 export function roundStats(r, games) {
