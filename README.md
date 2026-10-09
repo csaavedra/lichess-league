@@ -78,7 +78,8 @@ is all it takes to keep the tournament up to date.
   `{ "white": username, "black": username, "id": "" }`. Leave `id` empty
   until the game exists; then put in its 8-character ID, or any link to it,
   like `https://lichess.org/AbCd1234`. A player's own link to the game has
-  4 more characters; those are fine too, the page only keeps the first 8.
+  4 more characters. The page only uses the first 8, but the file is
+  published as it is, so leave the other 4 out.
 - `rated`: whether the games should be rated on Lichess (default `true`).
 - `timeControl`: the time control the games should have, either
   `{ "days": 3 }` (days per move) or `{ "minutes": 90, "increment": 30 }`
