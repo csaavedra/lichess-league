@@ -242,8 +242,8 @@ export function computeStandings(rounds, games, players, sc = DEFAULT_SCORING) {
       const b = ensure(g.black.id, g.black.username, true);
       if (g.result === "void") return;
       if (!g.result) {
-        cell(w, b).push({ live: true });
-        cell(b, w).push({ live: true });
+        cell(w, b).push({ id, live: true });
+        cell(b, w).push({ id, live: true });
         return;
       }
       for (const [me, opp, color] of [
@@ -255,7 +255,7 @@ export function computeStandings(rounds, games, players, sc = DEFAULT_SCORING) {
         me.pts += s;
         me.played++;
         if (kind === "w") me.wins++;
-        cell(me, opp).push({ s, kind });
+        cell(me, opp).push({ id, s, kind });
       }
     }),
   );
