@@ -1,0 +1,22 @@
+name: Format
+
+# Fails when the JavaScript isn't in Prettier's style; see Formatting in
+# HACKING.md. Separate from the Pages workflow, so it never holds up the demo.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      - run: python3 tools/format.py --check

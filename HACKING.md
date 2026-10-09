@@ -21,6 +21,8 @@ the [README](README.md).
 - `.github/workflows/pages.yml`: on every push to main, runs the tests and
   publishes the demo to https://csaavedra.github.io/lichess-league/. A main
   that fails its tests isn't published.
+- `.github/workflows/format.yml`: on pull requests and pushes to main, checks
+  that the JavaScript is formatted (see [Formatting](#formatting)).
 
 ## Tests
 
