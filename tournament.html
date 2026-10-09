@@ -268,6 +268,11 @@ table.pgames { border-collapse: collapse; width: 100%; font-size: 14.5px; font-v
 .pgames .num { text-align: right; }
 .sdlg td.opp { white-space: normal; }
 .sdlg td.opp small { font-weight: 500; }
+/* Places gained or lost since the seed. */
+.sdlg :is(.up, .down) { margin-left: 4px; white-space: nowrap; }
+.sdlg :is(.up, .down) svg { width: 0.7em; height: 0.7em; margin-right: 2px; }
+.sdlg .up { color: var(--live); }
+.sdlg .down { color: var(--warn); }
 /* Clipped rather than scrolled, so that the header sticks to the top of the dialog. */
 .sdlg .table-scroll { overflow: clip; }
 .sdlg thead th { position: sticky; top: 0; background: var(--surface); }
@@ -983,7 +988,8 @@ function renderSeeding() {
   const started = table.some((p) => p.played > 0);
   const rowsHTML = list.map((p) => {
     const nm = p.name || p.username;
-    const moved = p.moved ? `, <span class="${trend(p.moved)}">${p.moved > 0 ? "up" : "down"} ${Math.abs(p.moved)}</span>` : "";
+    const dir = p.moved > 0 ? "up" : "down";
+    const moved = p.moved ? ` <span class="${dir}">${icon(p.moved > 0 ? "M8 3l6 10H2z" : "M2 3h12L8 13z")}<span class="vh">${dir} </span>${Math.abs(p.moved)}</span>` : "";
     return `<tr tabindex="0" data-player="${esc(p.id)}"${p.id === state.seeding.at ? ' class="at"' : ""}>
       <td class="num">${p.seed}</td>
       <td class="opp">${esc(nm)}${nm !== p.username ? `<small>${esc(p.username)}</small>` : ""}</td>
