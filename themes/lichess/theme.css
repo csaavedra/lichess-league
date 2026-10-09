@@ -15,6 +15,7 @@
   --bg: hsl(37 7% 97%);
   --surface: hsl(0 0% 100%);
   --ink: hsl(0 0% 30%);
+  --ink-clear: hsl(0 0% 12%);
   --muted: hsl(0 0% 47%);
   --line: hsl(0 0% 85%);
   --self: hsl(37 12% 92%);
@@ -48,6 +49,7 @@
     --bg: hsl(37 7% 16%);
     --surface: hsl(37 7% 14%);
     --ink: hsl(0 0% 73%);
+    --ink-clear: hsl(0 0% 80%);
     --muted: hsl(0 0% 58%);
     --line: hsl(0 0% 25%);
     --self: hsl(37 5% 24%);
@@ -68,8 +70,12 @@
 body { background: var(--page) linear-gradient(to bottom, var(--page-top), var(--page) 116px) no-repeat; }
 .table-scroll, .game, .empty { box-shadow: var(--shadow); }
 .table-scroll, .game { border-color: transparent; }
-.game:hover { border-color: var(--accent); }
-.game.pending:hover { border-color: transparent; }
+/* A hovered card lights up in blue, as the boards of a Lichess broadcast. */
+.game:hover {
+  background: color-mix(in oklab, var(--accent) 12%, var(--surface));
+  border-color: color-mix(in oklab, var(--accent) 50%, var(--surface)); color: var(--ink-clear);
+}
+.game.pending:hover { background: var(--surface); border-color: transparent; color: inherit; }
 h1 { font-weight: 300; }
 h2 { font-size: 20px; }
 
@@ -173,5 +179,6 @@ button:not(.cross button, .tabs button, [aria-disabled="true"]):hover { color: v
 }
 
 @media (prefers-reduced-motion: no-preference) {
+  .game { transition: border-color 0.15s, background-color 0.15s, color 0.15s; }
   .tabs button { transition: color 0.25s, border-color 0.25s; }
 }
