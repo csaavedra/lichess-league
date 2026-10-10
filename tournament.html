@@ -152,11 +152,11 @@ table.cross { border-collapse: collapse; width: 100%; font-variant-numeric: tabu
   display: flex; flex-direction: column; gap: 10px;
 }
 .game:hover { border-color: var(--muted); }
-/* Items sit on the text's baseline, not in the middle of the line box, so
-   the chip lines up with the capitals whatever the theme's font metrics. */
+/* Black's side is always above the board and white's below, so the
+   sides need no colour chip. */
 .side { display: flex; align-items: baseline; gap: 8px; font-weight: 600; font-size: 15px; min-height: 22px; }
+/* The colour chips, where there is no board: player view, upcoming list. */
 .chip { display: inline-block; width: 12px; height: 12px; border-radius: 2px; border: 1px solid var(--muted); flex: none; vertical-align: -1px; }
-.side .chip { position: relative; top: 1px; } /* as vertical-align: -1px does for the chips in text */
 .chip.w { background: #fafaf5; }
 .chip.b { background: #222; }
 /* The name gives way before the rating: only the name is cut short. */
@@ -738,11 +738,11 @@ function ratingHTML(p, withDiff) {
 function sideHTML(p, color, g, withDiff = false) {
   const toMove = !g.result && g.turn === color;
   const score = scoreOf(g, color);
-  return `<div class="side${toMove ? " to-move" : ""}${score === 0 ? " lost" : ""}"><span class="chip ${color[0]}"></span>${rankHTML(p.id)}<span class="who"><span class="nm">${esc(displayName(p))}</span>${ratingHTML(p, withDiff)}</span><span class="sc">${score === null ? "" : fmtPts(score)}</span></div>`;
+  return `<div class="side${toMove ? " to-move" : ""}${score === 0 ? " lost" : ""}">${rankHTML(p.id)}<span class="who"><span class="nm">${esc(displayName(p))}</span>${ratingHTML(p, withDiff)}</span><span class="sc">${score === null ? "" : fmtPts(score)}</span></div>`;
 }
 
-function plainSideHTML(id, color) {
-  return `<div class="side"><span class="chip ${color[0]}"></span>${rankHTML(id)}<span class="who"><span class="nm">${esc(nameOf(id))}</span></span></div>`;
+function plainSideHTML(id) {
+  return `<div class="side">${rankHTML(id)}<span class="who"><span class="nm">${esc(nameOf(id))}</span></span></div>`;
 }
 
 function statusText(g) {
@@ -806,9 +806,9 @@ function renderGames() {
         else if (link)
           status += ` White sends the challenge: ${link}.${config.timeControl ? "" : " Pick the time control there."}`;
         return `<div class="game pending">
-        ${plainSideHTML(slot.black, "black")}
+        ${plainSideHTML(slot.black)}
         ${boardHTML(START_FEN, null)}
-        ${plainSideHTML(slot.white, "white")}
+        ${plainSideHTML(slot.white)}
         <div class="status">${status}</div>
       </div>`;
       }
