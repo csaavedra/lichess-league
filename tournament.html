@@ -304,6 +304,11 @@ footer a { color: inherit; text-underline-offset: 2px; }
   .game { padding: 10px; }
   .side { gap: 6px; }
 }
+/* Phones: the cards give the rating's room to the name. The game dialog
+   still shows it. Wider windows have room for both. */
+@media (max-width: 480px) {
+  .game .side .rt { display: none; }
+}
 @media (prefers-reduced-motion: no-preference) {
   .game { transition: border-color 0.15s; }
   .tabs .pulse::after {
