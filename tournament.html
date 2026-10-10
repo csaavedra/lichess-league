@@ -286,7 +286,7 @@ footer { color: var(--muted); font-size: 13.5px; border-top: 1px solid var(--lin
 footer a { color: inherit; text-underline-offset: 2px; }
 
 @media (max-width: 720px) {
-  .wrap { padding: 20px 14px 48px; }
+  .wrap { padding: 20px 12px 48px; }
   .dlg { padding: 16px; }
   /* One column, with the moves as a strip under the board. The two panels
      give their children to .dlg, which puts them in order. */
@@ -299,7 +299,10 @@ footer a { color: inherit; text-underline-offset: 2px; }
   .moves { order: 1; display: flex; overflow: auto hidden; margin-top: 10px; }
   .moves .no { flex: none; background: none; padding: 5px 2px 5px 8px; }
   .moves .move { flex: none; padding: 5px 8px; }
-  .games { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+  /* A little tighter, for the names on two columns of cards. */
+  .games { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+  .game { padding: 10px; }
+  .side { gap: 6px; }
 }
 @media (prefers-reduced-motion: no-preference) {
   .game { transition: border-color 0.15s; }
