@@ -47,9 +47,10 @@ copied.
 
 ## How it talks to Lichess
 
-- Games are fetched one at a time from `/game/export/{id}`. On a 429 the page
-  backs off for two minutes. Any other error skips that game until the next
-  refresh.
+- Games are fetched together from the bulk export, `/api/games/export/_ids`,
+  in one request. The single-game export, `/game/export/{id}`, needs a login
+  for games older than 10 days unless the players average 2200. On a 429 the
+  page backs off for two minutes. Any other error waits for the next refresh.
 - Lichess leaves the last 3 moves out of the export while a game is in
   progress. For correspondence games the page reads the full move list from
   the game stream when a position changes. Games with a clock get the same

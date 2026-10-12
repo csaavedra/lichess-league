@@ -3,7 +3,7 @@
 // finished games is tested in cache.test.js.
 import { test, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { fetchGame, fetchHistory } from "../lichess.js";
+import { fetchGames, fetchHistory } from "../lichess.js";
 
 const realFetch = globalThis.fetch;
 afterEach(() => {
@@ -130,22 +130,47 @@ test("fetchHistory: nothing on an error, a rate error on a 429", async () => {
   await assert.rejects(fetchHistory(g), (err) => err.rate === true);
 });
 
-test("fetchGame: the export, null when Lichess doesn't know the game, errors otherwise", async () => {
-  const urls = fakeFetch(200, () =>
-    JSON.stringify({ id: "AbCd1234", status: "started" }),
+test("fetchGames: one request, without the games Lichess doesn't know", async () => {
+  const requests = [];
+  globalThis.fetch = async (url, init) => {
+    requests.push({ url: String(url), init });
+    return new Response(
+      '{"id":"AbCd1234","status":"started"}\n{"id":"EfGh5678","status":"mate"}\n',
+    );
+  };
+  const games = await fetchGames(["AbCd1234", "EfGh5678", "Missing1"]);
+  assert.deepEqual(
+    [...games],
+    [
+      ["AbCd1234", { id: "AbCd1234", status: "started" }],
+      ["EfGh5678", { id: "EfGh5678", status: "mate" }],
+    ],
   );
-  assert.deepEqual(await fetchGame("AbCd1234"), {
-    id: "AbCd1234",
-    status: "started",
-  });
-  assert.match(urls[0], /^https:\/\/lichess\.org\/game\/export\/AbCd1234\?/);
-  fakeFetch(404);
-  assert.equal(await fetchGame("AbCd1234"), null);
+  assert.equal(requests.length, 1);
+  assert.match(
+    requests[0].url,
+    /^https:\/\/lichess\.org\/api\/games\/export\/_ids\?/,
+  );
+  assert.equal(requests[0].init.method, "POST");
+  assert.equal(requests[0].init.body, "AbCd1234,EfGh5678,Missing1");
+});
+
+test("fetchGames: at most 300 IDs a request", async () => {
+  const bodies = [];
+  globalThis.fetch = async (url, init) => {
+    bodies.push(init.body.split(",").length);
+    return new Response("");
+  };
+  await fetchGames(Array.from({ length: 301 }, String));
+  assert.deepEqual(bodies, [300, 1]);
+});
+
+test("fetchGames: a rate error on a 429, an error otherwise", async () => {
   fakeFetch(429);
-  await assert.rejects(fetchGame("AbCd1234"), (err) => err.rate === true);
+  await assert.rejects(fetchGames(["AbCd1234"]), (err) => err.rate === true);
   fakeFetch(500);
   await assert.rejects(
-    fetchGame("AbCd1234"),
+    fetchGames(["AbCd1234"]),
     (err) => !err.rate && /status 500/.test(err.message),
   );
 });
