@@ -62,8 +62,19 @@ function find(cfg, parsed, id) {
   return null;
 }
 
+// Like the bulk export: a Map from ID to the game, without the games
+// Lichess wouldn't know.
+export async function fetchGames(ids) {
+  const games = new Map();
+  for (const id of ids) {
+    const g = await makeGame(id);
+    if (g) games.set(id, g);
+  }
+  return games;
+}
+
 // The game as Lichess would export it, or null when Lichess wouldn't know it.
-export async function fetchGame(id) {
+async function makeGame(id) {
   const { cfg, parsed, Chess, growing } = await load();
   const found = find(cfg, parsed, id);
   if (!found || found.d.missing) return null;

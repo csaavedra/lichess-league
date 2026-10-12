@@ -394,7 +394,7 @@ import {
   subtitleText,
 } from "./lib.js";
 import {
-  fetchGame,
+  fetchGames,
   fetchHistory,
   finishedGame,
   cacheFinished,
@@ -1486,17 +1486,10 @@ async function refresh(manual) {
     }
     if (!manual && Date.now() < state.pausedUntil) return;
     renderSync("Updating…");
-    // A game that fails doesn't stop the others; a 429 stops them all.
-    let failure = null;
-    for (const id of config.allIds.filter((id) => !finishedGame(id))) {
-      let raw;
-      try {
-        raw = await fetchGame(id);
-      } catch (err) {
-        if (err.rate) throw err;
-        failure = err;
-        continue;
-      }
+    const ids = config.allIds.filter((id) => !finishedGame(id));
+    const fetched = await fetchGames(ids);
+    for (const id of ids) {
+      const raw = fetched.get(id);
       if (!raw) {
         notFound.add(id);
         continue;
@@ -1506,7 +1499,6 @@ async function refresh(manual) {
       if (finishedGame(id)) liveGames.delete(id);
       else liveGames.set(id, raw);
     }
-    if (failure) throw failure;
     showGames();
     if (!roundSettled) {
       state.round = currentRound(config.rounds, state.games);

@@ -6,23 +6,36 @@ import { gameCache } from "./lib.js";
 // A 429: the caller should back off before asking again.
 const rateError = () => Object.assign(new Error("rate"), { rate: true });
 
-// One game at a time through the single-game export, as the API docs ask
-// for one request at a time. The bulk endpoint (/api/games/export/_ids)
-// allows only 2 concurrent requests per IP address, shared with everyone
-// else on the same network.
+// The bulk export, as the single-game one needs a login for most games
+// older than 10 days (see HACKING.md). It takes up to 300 IDs a request and
+// allows 2 requests at a time per IP address, shared with everyone else on
+// the same network.
 const EXPORT_PARAMS =
   "moves=true&lastFen=true&opening=true&evals=false&clocks=false&accuracy=false&literate=false";
+const MAX_IDS = 300;
 
-// The game as Lichess exports it, or null when Lichess doesn't know it.
-export async function fetchGame(id) {
-  const res = await fetch(
-    `https://lichess.org/game/export/${id}?${EXPORT_PARAMS}`,
-    { headers: { Accept: "application/json" } },
-  );
-  if (res.status === 404) return null;
-  if (res.status === 429) throw rateError();
-  if (!res.ok) throw new Error(`Lichess answered with status ${res.status}.`);
-  return res.json();
+// A Map from ID to the game as Lichess exports it. Games Lichess doesn't
+// know are left out.
+export async function fetchGames(ids) {
+  const games = new Map();
+  for (let i = 0; i < ids.length; i += MAX_IDS) {
+    const res = await fetch(
+      `https://lichess.org/api/games/export/_ids?${EXPORT_PARAMS}`,
+      {
+        method: "POST",
+        headers: { Accept: "application/x-ndjson" },
+        body: ids.slice(i, i + MAX_IDS).join(","),
+      },
+    );
+    if (res.status === 429) throw rateError();
+    if (!res.ok) throw new Error(`Lichess answered with status ${res.status}.`);
+    for (const line of (await res.text()).split("\n")) {
+      if (!line.trim()) continue;
+      const g = JSON.parse(line);
+      games.set(g.id, g);
+    }
+  }
+  return games;
 }
 
 // The export leaves out the last 3 moves of games in progress (an anti-cheat
