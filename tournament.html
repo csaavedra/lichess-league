@@ -1455,7 +1455,8 @@ const FILE_HINT =
   " Browsers don't let a page opened straight from disk read other files. Serve the folder instead, for example with python3 -m http.server, and open http://localhost:8000/tournament.html.";
 const RATE_PAUSE_MS = 120000;
 let busy = false,
-  retryTimer = null;
+  retryTimer = null,
+  lastTry = 0; // when the page last asked Lichess, whether it worked or not
 async function refresh(manual) {
   if (busy) return;
   busy = true;
@@ -1486,6 +1487,7 @@ async function refresh(manual) {
     }
     if (!manual && Date.now() < state.pausedUntil) return;
     renderSync("Updating…");
+    lastTry = Date.now();
     const ids = config.allIds.filter((id) => !finishedGame(id));
     const fetched = await fetchGames(ids);
     for (const id of ids) {
@@ -1519,7 +1521,7 @@ async function refresh(manual) {
       renderSync("Lichess asked us to slow down. Retrying in 2 minutes.");
     } else {
       renderSync("Update failed");
-      notices.fetch = `Could not load games from Lichess. ${err.message || ""} The page will try again automatically. If this keeps happening, check your network connection and the game IDs.`;
+      notices.fetch = `Could not load games from Lichess. ${err.message || ""} The page will try again automatically. If this keeps happening, check your network connection.`;
       renderNotice();
     }
   } finally {
@@ -1547,12 +1549,9 @@ setInterval(() => {
   tickDeadlines();
   if (state.lastUpdate && !busy && !syncMsg) renderSync();
 }, 15000);
+// A failed update leaves lastUpdate behind, so time this from the last try.
 document.addEventListener("visibilitychange", () => {
-  if (
-    !document.hidden &&
-    (!state.lastUpdate || Date.now() - state.lastUpdate > 30000)
-  )
-    refresh();
+  if (!document.hidden && Date.now() - lastTry > 30000) refresh();
 });
 </script>
 </body>
