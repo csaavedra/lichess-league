@@ -200,6 +200,21 @@ table.cross { border-collapse: collapse; width: 100%; font-variant-numeric: tabu
 .sq.d { background: var(--sq-dark); }
 .sq.hl::before { content: ""; position: absolute; inset: 0; background: var(--last); }
 .sq img { position: absolute; inset: 0; width: 100%; height: 100%; }
+/* The coordinates on the board of a game, inside the board: the ranks at
+   the top right of their squares, the files at the bottom left, each in the
+   colour of the other kind of square, a little darker on the light ones.
+   They grow with the board, 12px on a 576px one, and so do their gaps to
+   the edges, so the pieces cover as much of them at any size. They hang
+   from the edges, so they sit the same in any font. */
+.dlg-board { container-type: inline-size; }
+.sq .co {
+  position: absolute; font-weight: 700; line-height: normal;
+  color: color-mix(in srgb, var(--sq-dark) 82%, black);
+  font-size: clamp(7px, 2.08cqw, 12px); pointer-events: none;
+}
+.sq.d .co { color: var(--sq-light); }
+.sq .co.rank { top: 0.083em; right: 0.23em; }
+.sq .co.file { bottom: 0; left: 0.33em; }
 
 .empty {
   background: var(--surface); border: 1px dashed var(--line); border-radius: var(--radius);
@@ -592,20 +607,24 @@ function rankHTML(id) {
 }
 
 // ---------- rendering ----------
-function boardHTML(fen, last) {
+function boardHTML(fen, last, coords = false) {
   const squares = boardSquares(fen || START_FEN).map((p, i) =>
-    sq(i >> 3, i % 8, p, last),
+    sq(i >> 3, i % 8, p, last, coords),
   );
   return `<div class="board" aria-hidden="true">${squares.join("")}</div>`;
 }
-function sq(r, f, piece, last) {
+function sq(r, f, piece, last, coords) {
   const name = "abcdefgh"[f] + (8 - r);
   const dark = (r + f) % 2 === 1;
   const hl = last && (last[0] === name || last[1] === name);
   let inner = "";
+  // The coordinates, under the pieces: the ranks on the h-file, the files on
+  // the first rank.
+  if (coords && f === 7) inner += `<span class="co rank">${name[1]}</span>`;
+  if (coords && r === 7) inner += `<span class="co file">${name[0]}</span>`;
   if (piece) {
     const color = piece === piece.toUpperCase() ? "w" : "b";
-    inner = `<img src="${PIECE_URL}${color}${piece.toUpperCase()}.svg" alt="" draggable="false">`;
+    inner += `<img src="${PIECE_URL}${color}${piece.toUpperCase()}.svg" alt="" draggable="false">`;
   }
   return `<div class="sq${dark ? " d" : ""}${hl ? " hl" : ""}">${inner}</div>`;
 }
@@ -964,7 +983,7 @@ function renderDialog() {
     </div>
     <div class="board-panel">
       ${sideHTML(g.black, "black", g, true)}
-      <div class="dlg-board" id="dlg-board">${boardHTML(cur.fen, cur.last)}</div>
+      <div class="dlg-board" id="dlg-board">${boardHTML(cur.fen, cur.last, true)}</div>
       ${sideHTML(g.white, "white", g, true)}
       <div class="controls">
         <button type="button" data-act="first" aria-label="First position">${icon("M2 3h2v10H2zM9 3v10L4 8zM14 3v10L9 8z")}</button>
@@ -1026,7 +1045,7 @@ function step(to) {
   const d = document.getElementById("dlg");
   const cur = o.positions[ply];
   const board = d.querySelector("#dlg-board");
-  board.innerHTML = boardHTML(cur.fen, cur.last);
+  board.innerHTML = boardHTML(cur.fen, cur.last, true);
   slidePieces(board, prev.fen, cur.fen);
   d.querySelectorAll(".move.cur").forEach((b) => b.classList.remove("cur"));
   const btn = d.querySelector(`.move[data-ply="${ply}"]`);
