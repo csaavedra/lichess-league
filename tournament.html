@@ -460,7 +460,7 @@ const esc = (s) =>
 // font has them, at different sizes, and some render as emoji.
 const icon = (d) =>
   `<svg viewBox="0 0 16 16" width="1em" height="1em" fill="currentColor" aria-hidden="true"><path d="${d}"/></svg>`;
-const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
 function ago(ts) {
   if (!ts) return "";
   const s = Math.round((ts - Date.now()) / 1000);
