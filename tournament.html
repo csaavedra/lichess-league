@@ -448,6 +448,7 @@ const state = {
   playerBack: false, // the player view was opened from the seeding
   seeding: null, // seeding view: { at }, the player it was opened for, if any
 };
+const dlg = document.getElementById("dlg"); // the one dialog, for every view
 let roundSettled = false; // until the first fetch or a click, the round shown can still move to currentRound()
 let baseLink = ""; // the fragment for the page under the dialog: a round the viewer picked, or none
 let linkPending = true; // until the fragment the page was opened with has been applied
@@ -463,8 +464,19 @@ const esc = (s) =>
   );
 // Move buttons are drawn, not typed: arrow characters come from whichever
 // font has them, at different sizes, and some render as emoji.
-const icon = (d) =>
-  `<svg viewBox="0 0 16 16" width="1em" height="1em" fill="currentColor" aria-hidden="true"><path d="${d}"/></svg>`;
+const ICONS = {
+  first: "M2 3h2v10H2zM9 3v10L4 8zM14 3v10L9 8z",
+  prev: "M12 3v10L4 8z",
+  next: "M4 3v10l8-5z",
+  last: "M2 3v10l5-5zM7 3v10l5-5zM12 3h2v10h-2z",
+  up: "M8 3l6 10H2z",
+  down: "M2 3h12L8 13z",
+};
+const icon = (name) =>
+  `<svg viewBox="0 0 16 16" width="1em" height="1em" fill="currentColor" aria-hidden="true"><path d="${ICONS[name]}"/></svg>`;
+// The index the arrow keys, Home and End move to in a row of things.
+const navTarget = (key, cur, end) =>
+  ({ ArrowLeft: cur - 1, ArrowRight: cur + 1, Home: 0, End: end })[key];
 const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
 function ago(ts) {
   if (!ts) return "";
@@ -594,10 +606,17 @@ async function updateHistories() {
 }
 
 const seedOf = (id) => config.roster.get(id)?.seed ?? null;
-// A player from a game (Lichess has the right capitalisation), or a username from the schedule.
-const displayName = (p) => config.roster.get(p.id)?.name || p.username;
-const nameOf = (id) =>
-  config.roster.get(id)?.name || config.roster.get(id)?.username || id;
+// A player's name from the roster, else the username: the one given (from a
+// game, as Lichess has the right capitalisation), the roster's, or the id.
+const nameOf = (id, username) => {
+  const p = config.roster.get(id);
+  return p?.name || username || p?.username || id;
+};
+const displayName = (p) => nameOf(p.id, p.username);
+// " (blitz)": what a seed rating was taken from, if the roster says.
+const basisText = (p) => (p.seedBasis ? ` (${esc(p.seedBasis)})` : "");
+// The index of the round a game is scheduled in, or -1.
+const roundOf = (id) => config.rounds.findIndex((r) => r.ids.includes(id));
 
 const standings = () =>
   computeStandings(config.rounds, state.games, config.roster, config.scoring);
@@ -662,7 +681,7 @@ function renderStandings() {
     const seed = seedOf(p.id);
     const rating =
       cfgP?.seedRating != null
-        ? `<span title="Seed rating${cfgP.seedBasis ? ` (${esc(cfgP.seedBasis)})` : ""}">${cfgP.seedRating}</span>`
+        ? `<span title="Seed rating${basisText(cfgP)}">${cfgP.seedRating}</span>`
         : "";
     const user = nm !== p.username ? esc(p.username) : "";
     const sub =
@@ -960,9 +979,7 @@ function pageTitle() {
 function applyLink(final, onLoad = false) {
   const v = parseLink(location.hash) || {};
   const dialog = v.game || v.player || v.seeding;
-  let round = v.game
-    ? config.rounds.findIndex((r) => r.ids.includes(v.game))
-    : (v.round ?? -1);
+  let round = v.game ? roundOf(v.game) : (v.round ?? -1);
   if (round >= config.rounds.length) round = -1;
   if (round >= 0) {
     state.round = round;
@@ -1013,10 +1030,9 @@ function openGame(id, back) {
   // renderDialog() fills in the positions and moves to the latest one.
   state.open = { id, positions: [], ply: -1, back: back || null };
   renderDialog();
-  const d = document.getElementById("dlg");
   showDialog();
   // A closed dialog has no size, so scroll the list once it's open.
-  showMove(d.querySelector(".move.cur"));
+  showMove(dlg.querySelector(".move.cur"));
 }
 
 function renderDialog() {
@@ -1035,7 +1051,7 @@ function renderDialog() {
   }
   const ply = state.open.ply;
   const cur = state.open.positions[ply];
-  const rName = config.rounds.find((r) => r.ids.includes(id))?.name || "";
+  const rName = config.rounds[roundOf(id)]?.name || "";
 
   let movesHTML = '<div class="moves" id="moves">';
   for (let i = 0; i < g.moves.length; i += 2) {
@@ -1050,8 +1066,7 @@ function renderDialog() {
     movesHTML += '<div class="no"></div><span class="none">No moves yet</span>';
   movesHTML += "</div>";
 
-  const d = document.getElementById("dlg");
-  d.innerHTML = `<div class="dlg gdlg">
+  dlg.innerHTML = `<div class="dlg gdlg">
     <div class="head">
       <div>
         <h3 id="dlg-title">${esc(displayName(g.white))} against ${esc(displayName(g.black))}</h3>
@@ -1067,10 +1082,10 @@ function renderDialog() {
       <div class="dlg-board" id="dlg-board">${boardHTML(cur.fen, cur.last, true)}</div>
       ${sideHTML(g.white, "white", g, true)}
       <div class="controls">
-        <button type="button" data-act="first" aria-label="First position">${icon("M2 3h2v10H2zM9 3v10L4 8zM14 3v10L9 8z")}</button>
-        <button type="button" data-act="prev" aria-label="Previous move">${icon("M12 3v10L4 8z")}</button>
-        <button type="button" data-act="next" aria-label="Next move">${icon("M4 3v10l8-5z")}</button>
-        <button type="button" data-act="last" aria-label="Latest position">${icon("M2 3v10l5-5zM7 3v10l5-5zM12 3h2v10h-2z")}</button>
+        <button type="button" data-act="first" aria-label="First position">${icon("first")}</button>
+        <button type="button" data-act="prev" aria-label="Previous move">${icon("prev")}</button>
+        <button type="button" data-act="next" aria-label="Next move">${icon("next")}</button>
+        <button type="button" data-act="last" aria-label="Latest position">${icon("last")}</button>
       </div>
       <p class="keys">← → or mouse wheel to step through moves, Home and End for the start and latest position.</p>
     </div>
@@ -1081,8 +1096,8 @@ function renderDialog() {
       <a href="https://lichess.org/${esc(g.id)}" target="_blank" rel="noopener">Open on Lichess</a>
     </div>
   </div>`;
-  slidePieces(d.querySelector("#dlg-board"), prev?.fen, cur.fen);
-  showMove(d.querySelector(".move.cur"));
+  slidePieces(dlg.querySelector("#dlg-board"), prev?.fen, cur.fen);
+  showMove(dlg.querySelector(".move.cur"));
   updateControls();
 }
 
@@ -1109,7 +1124,7 @@ function showMove(btn) {
 function updateControls() {
   const o = state.open;
   const end = o.ply === o.positions.length - 1;
-  for (const b of document.querySelectorAll("#dlg .controls button")) {
+  for (const b of dlg.querySelectorAll(".controls button")) {
     const off =
       b.dataset.act === "first" || b.dataset.act === "prev" ? o.ply === 0 : end;
     b.setAttribute("aria-disabled", off);
@@ -1123,18 +1138,17 @@ function step(to) {
   if (ply === o.ply) return;
   const prev = o.positions[o.ply];
   o.ply = ply;
-  const d = document.getElementById("dlg");
   const cur = o.positions[ply];
-  const board = d.querySelector("#dlg-board");
+  const board = dlg.querySelector("#dlg-board");
   board.innerHTML = boardHTML(cur.fen, cur.last, true);
   slidePieces(board, prev.fen, cur.fen);
-  d.querySelectorAll(".move.cur").forEach((b) => b.classList.remove("cur"));
-  const btn = d.querySelector(`.move[data-ply="${ply}"]`);
+  dlg.querySelectorAll(".move.cur").forEach((b) => b.classList.remove("cur"));
+  const btn = dlg.querySelector(`.move[data-ply="${ply}"]`);
   if (btn) {
     btn.classList.add("cur");
     showMove(btn);
   } else {
-    const list = d.querySelector("#moves");
+    const list = dlg.querySelector("#moves");
     if (list && ply === 0) list.scrollTop = list.scrollLeft = 0;
   }
   updateControls();
@@ -1170,9 +1184,8 @@ function openPlayer(pid, fromSeeding = false) {
   state.player = pid;
   state.playerBack = fromSeeding;
   renderPlayer();
-  const d = document.getElementById("dlg");
   showDialog();
-  d.scrollTop = 0;
+  dlg.scrollTop = 0;
 }
 
 // Which ratings an average used: n games, lichessN of them with a Lichess rating for want of a seed rating.
@@ -1313,12 +1326,11 @@ function renderPlayer() {
     })
     .join("");
 
-  const d = document.getElementById("dlg");
-  d.innerHTML = `<div class="dlg pdlg">
+  dlg.innerHTML = `<div class="dlg pdlg">
     <div class="head">
       <div>
         <h3 id="dlg-title">${esc(nm)}</h3>
-        <p>${cfgP.seedRating != null ? `Seed rating ${cfgP.seedRating}${cfgP.seedBasis ? ` (${esc(cfgP.seedBasis)})` : ""} · ` : ""}<a href="https://lichess.org/@/${esc(row.username)}" target="_blank" rel="noopener">${esc(row.username)} on Lichess</a></p>
+        <p>${cfgP.seedRating != null ? `Seed rating ${cfgP.seedRating}${basisText(cfgP)} · ` : ""}<a href="https://lichess.org/@/${esc(row.username)}" target="_blank" rel="noopener">${esc(row.username)} on Lichess</a></p>
       </div>
       <div class="actions">${state.playerBack ? '<button type="button" data-act="seeding">← Seeding</button>' : ""}<button type="button" data-act="close" autofocus>Close</button></div>
     </div>
@@ -1341,7 +1353,7 @@ function renderPlayer() {
 
 // ---------- seeding ----------
 const seedingRow = (id) =>
-  document.querySelector(`#dlg tr[data-player="${CSS.escape(id)}"]`);
+  dlg.querySelector(`tr[data-player="${CSS.escape(id)}"]`);
 
 // at: the player to show and highlight, when opened from their seed or
 // back from their view; from the Seed header, none.
@@ -1350,9 +1362,8 @@ function openSeeding(at) {
   state.player = null;
   state.seeding = { at: at || null };
   renderSeeding();
-  const d = document.getElementById("dlg");
   showDialog();
-  d.scrollTop = 0;
+  dlg.scrollTop = 0;
   const row = at && seedingRow(at);
   if (row) {
     row.scrollIntoView({ block: "center" });
@@ -1361,9 +1372,8 @@ function openSeeding(at) {
 }
 
 function renderSeeding() {
-  const d = document.getElementById("dlg");
   // A refresh redraws the rows: keep the focus on the one that had it.
-  const focused = d.contains(document.activeElement)
+  const focused = dlg.contains(document.activeElement)
     ? document.activeElement.closest("tr[data-player]")?.dataset.player
     : null;
   const table = standings();
@@ -1372,10 +1382,10 @@ function renderSeeding() {
   const started = table.some((p) => p.played > 0);
   const rowsHTML = list
     .map((p) => {
-      const nm = p.name || p.username;
+      const nm = nameOf(p.id);
       const dir = p.moved > 0 ? "up" : "down";
       const moved = p.moved
-        ? ` <span class="${dir}">${icon(p.moved > 0 ? "M8 3l6 10H2z" : "M2 3h12L8 13z")}<span class="vh">${dir} </span>${Math.abs(p.moved)}</span>`
+        ? ` <span class="${dir}">${icon(dir)}<span class="vh">${dir} </span>${Math.abs(p.moved)}</span>`
         : "";
       return `<tr tabindex="0" data-player="${esc(p.id)}"${p.id === state.seeding.at ? ' class="at"' : ""}>
       <td class="num">${p.seed}</td>
@@ -1386,7 +1396,7 @@ function renderSeeding() {
     })
     .join("");
 
-  d.innerHTML = `<div class="dlg pdlg sdlg">
+  dlg.innerHTML = `<div class="dlg pdlg sdlg">
     <div class="head">
       <div>
         <h3 id="dlg-title">Seeding</h3>
@@ -1417,12 +1427,7 @@ document.getElementById("tabs").addEventListener("click", (e) => {
 });
 document.getElementById("tabs").addEventListener("keydown", (e) => {
   const n = config.rounds.length;
-  const to = {
-    ArrowLeft: state.round - 1,
-    ArrowRight: state.round + 1,
-    Home: 0,
-    End: n - 1,
-  }[e.key];
+  const to = navTarget(e.key, state.round, n - 1);
   if (to === undefined || !n) return;
   e.preventDefault();
   selectRound((to + n) % n);
@@ -1454,7 +1459,6 @@ document.addEventListener("mouseover", (e) => {
   if (nm.scrollWidth > nm.clientWidth) nm.title = nm.textContent;
   else nm.removeAttribute("title");
 });
-const dlg = document.getElementById("dlg");
 // A row in the player view opens its game; one in the seeding, its player.
 function openRow(el) {
   const tr = el.closest("tr[data-game], tr[data-player]");
@@ -1505,12 +1509,7 @@ dlg.addEventListener("keydown", (e) => {
 document.addEventListener("keydown", (e) => {
   const o = state.open;
   if (!o || !dlg.open || e.altKey || e.ctrlKey || e.metaKey) return;
-  const to = {
-    ArrowLeft: o.ply - 1,
-    ArrowRight: o.ply + 1,
-    Home: 0,
-    End: Infinity,
-  }[e.key];
+  const to = navTarget(e.key, o.ply, Infinity);
   if (to === undefined) return;
   e.preventDefault();
   step(to);
