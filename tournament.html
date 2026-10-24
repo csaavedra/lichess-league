@@ -355,7 +355,7 @@ footer a { color: inherit; text-underline-offset: 2px; }
 
   <p class="notice" id="notice" hidden></p>
 
-  <section aria-labelledby="standings-h">
+  <section id="standings" aria-labelledby="standings-h">
     <h2 id="standings-h">Standings</h2>
     <div class="table-scroll"><table class="cross" id="cross"></table></div>
     <p class="legend">Numbered columns are opponents in standings order. A green dot marks a game in progress. Ties on points are broken by TW (wins against the other players on the same points, shown only when tied), then SB (Sonneborn–Berger), then wins, then seed. Select a player's name to see their tournament performance, or a seed to see the seeding.</p>
@@ -391,6 +391,8 @@ import {
   roundStats,
   roundState,
   currentRound,
+  parseLink,
+  linkOf,
   boardSquares,
   pieceMoves,
   computeStandings,
@@ -447,6 +449,9 @@ const state = {
   seeding: null, // seeding view: { at }, the player it was opened for, if any
 };
 let roundSettled = false; // until the first fetch or a click, the round shown can still move to currentRound()
+let baseLink = ""; // the fragment for the page under the dialog: a round the viewer picked, or none
+let linkPending = true; // until the fragment the page was opened with has been applied
+let fromLink = false; // while opening a view from the fragment
 
 const esc = (s) =>
   String(s ?? "").replace(
@@ -518,7 +523,7 @@ async function loadConfig() {
 function applyConfig(cfg) {
   config = cfg;
   document.getElementById("title").textContent = cfg.title;
-  document.title = cfg.title;
+  document.title = pageTitle();
   if (state.round === null || state.round >= cfg.rounds.length)
     state.round = currentRound(cfg.rounds, state.games);
   notices.ids = cfg.warnings.join(" ");
@@ -911,6 +916,82 @@ function renderAll() {
   else if (state.seeding) renderSeeding();
 }
 
+// ---------- links ----------
+// The address bar follows the view, so that a link or a reload opens it
+// again. A dialog opened from the page gets its own history entry, so Back
+// closes it; moving between views inside it replaces that entry.
+function showDialog() {
+  const opening = !dlg.open;
+  if (opening) dlg.showModal();
+  writeLink(opening && !fromLink);
+}
+
+function currentLink() {
+  if (state.open) return linkOf({ game: state.open.id });
+  if (state.player) return linkOf({ player: state.player });
+  if (state.seeding) return linkOf({ seeding: true });
+  return baseLink;
+}
+
+function writeLink(push) {
+  const h = currentLink();
+  const url = h || location.pathname + location.search;
+  if (push) history.pushState({ dialog: true }, "", url);
+  else if (h !== location.hash)
+    history.replaceState(dlg.open ? history.state : null, "", url);
+  document.title = pageTitle();
+}
+
+function pageTitle() {
+  const g = state.open && state.games.get(state.open.id);
+  const view = g
+    ? `${displayName(g.white)} against ${displayName(g.black)}`
+    : state.player
+      ? nameOf(state.player)
+      : state.seeding
+        ? "Seeding"
+        : "";
+  return view ? `${view} · ${config.title}` : config.title;
+}
+
+// Shows the view in the fragment: when the page loads (onLoad), and on Back,
+// Forward or a fragment typed in. A game that hasn't loaded yet waits for
+// the first update from Lichess (final); one still missing then is dropped.
+function applyLink(final, onLoad = false) {
+  const v = parseLink(location.hash) || {};
+  const dialog = v.game || v.player || v.seeding;
+  let round = v.game
+    ? config.rounds.findIndex((r) => r.ids.includes(v.game))
+    : (v.round ?? -1);
+  if (round >= config.rounds.length) round = -1;
+  if (round >= 0) {
+    state.round = round;
+    roundSettled = true;
+    renderTabs();
+    renderGames();
+    // A game from another round than the one picked takes its place.
+    if (v.game && parseLink(baseLink)?.round !== undefined)
+      baseLink = linkOf({ round });
+  }
+  if (!dialog)
+    baseLink = v.round === undefined || round >= 0 ? location.hash : "";
+  // The browser looks for the fragment before there's anything to scroll.
+  if (onLoad && !dialog)
+    document
+      .getElementById(round >= 0 ? "games-h" : location.hash.slice(1))
+      ?.scrollIntoView();
+  linkPending = false;
+  fromLink = true;
+  if (state.games.has(v.game)) openGame(v.game);
+  else if (v.player && standings().some((p) => p.id === v.player))
+    openPlayer(v.player);
+  else if (v.seeding) openSeeding();
+  else if (v.game && !final) linkPending = true;
+  else if (dlg.open) dlg.close();
+  else writeLink(false);
+  fromLink = false;
+}
+
 // ---------- game dialog ----------
 function buildPositions(g) {
   if (g.positions) return g.positions;
@@ -933,7 +1014,7 @@ function openGame(id, back) {
   state.open = { id, positions: [], ply: -1, back: back || null };
   renderDialog();
   const d = document.getElementById("dlg");
-  if (!d.open) d.showModal();
+  showDialog();
   // A closed dialog has no size, so scroll the list once it's open.
   showMove(d.querySelector(".move.cur"));
 }
@@ -1090,7 +1171,7 @@ function openPlayer(pid, fromSeeding = false) {
   state.playerBack = fromSeeding;
   renderPlayer();
   const d = document.getElementById("dlg");
-  if (!d.open) d.showModal();
+  showDialog();
   d.scrollTop = 0;
 }
 
@@ -1270,7 +1351,7 @@ function openSeeding(at) {
   state.seeding = { at: at || null };
   renderSeeding();
   const d = document.getElementById("dlg");
-  if (!d.open) d.showModal();
+  showDialog();
   d.scrollTop = 0;
   const row = at && seedingRow(at);
   if (row) {
@@ -1325,6 +1406,8 @@ function renderSeeding() {
 function selectRound(i) {
   state.round = i;
   roundSettled = true;
+  baseLink = linkOf({ round: i });
+  writeLink(false);
   renderTabs();
   renderGames();
 }
@@ -1464,6 +1547,12 @@ dlg.addEventListener("close", () => {
   state.player = null;
   state.playerBack = false;
   state.seeding = null;
+  // Back to the page's own entry, if the dialog has one.
+  if (history.state?.dialog) history.back();
+  else writeLink(false);
+});
+addEventListener("popstate", () => {
+  if (!linkPending) applyLink(true);
 });
 document
   .getElementById("refresh")
@@ -1499,9 +1588,11 @@ async function refresh(manual) {
     if (changed || !state.lastUpdate) {
       showGames();
       renderAll();
+      if (linkPending) applyLink(false, true);
     }
     if (!config.allIds.length) {
       renderSync("No games added yet");
+      if (linkPending) applyLink(true);
       return;
     }
     if (!manual && Date.now() < state.pausedUntil) return;
@@ -1529,6 +1620,7 @@ async function refresh(manual) {
     notices.fetch = "";
     renderSync();
     renderAll();
+    if (linkPending) applyLink(true);
     await updateHistories();
   } catch (err) {
     showGames();
