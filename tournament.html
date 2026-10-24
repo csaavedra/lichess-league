@@ -122,7 +122,10 @@ table.cross { border-collapse: separate; border-spacing: 0; width: 100%; font-va
 /* No tap highlight: on a phone it covers the whole cell and can stay on
    behind the view the tap opens. */
 .cross { -webkit-tap-highlight-color: transparent; }
-.cross :is(.pname:hover strong, .seedbtn:hover, .resbtn:hover span) { text-decoration: underline; text-underline-offset: 3px; }
+/* Only where there's a real hover: a phone keeps :hover on what was tapped. */
+@media (hover: hover) {
+  .cross :is(.pname:hover strong, .seedbtn:hover, .resbtn:hover span) { text-decoration: underline; text-underline-offset: 3px; }
+}
 .legend { color: var(--muted); font-size: 13px; margin: 8px 2px 0; }
 
 /* Round tabs */
