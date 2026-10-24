@@ -887,12 +887,15 @@ function renderGames() {
       </div>`;
       }
       const mismatch = mismatchText(slot, g);
-      return `<div class="game" role="button" tabindex="0" data-id="${esc(g.id)}" data-fen="${esc(g.fen)}" aria-label="${esc(displayName(g.white))} against ${esc(displayName(g.black))}, open game">
+      // A button's label replaces what's in it, so the status and the
+      // warning are its description, or screen readers would skip them.
+      const id = esc(g.id);
+      return `<div class="game" role="button" tabindex="0" data-id="${id}" data-fen="${esc(g.fen)}" aria-label="${esc(displayName(g.white))} against ${esc(displayName(g.black))}, open game" aria-describedby="st-${id}${mismatch ? ` warn-${id}` : ""}">
       ${sideHTML(g.black, "black", g)}
       ${boardHTML(g.fen, g.last)}
       ${sideHTML(g.white, "white", g)}
-      <div class="status">${statusText(g)}</div>
-      ${mismatch ? `<div class="status warn">${esc(mismatch)}</div>` : ""}
+      <div class="status" id="st-${id}">${statusText(g)}</div>
+      ${mismatch ? `<div class="status warn" id="warn-${id}">${esc(mismatch)}</div>` : ""}
     </div>`;
     })
     .join("");
