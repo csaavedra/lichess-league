@@ -349,6 +349,39 @@ export function currentRound(rounds, games) {
   );
 }
 
+// ---------- links ----------
+// The views a link can open, as URL fragments: #round-2, #game-AbCd1234,
+// #player-alice and #seeding. Rounds count from 1 in a link and from 0 here.
+// null for any other fragment.
+export function parseLink(hash) {
+  let s;
+  try {
+    s = decodeURIComponent(String(hash || "").replace(/^#/, ""));
+  } catch {
+    return null;
+  }
+  if (s === "seeding") return { seeding: true };
+  const [, kind, arg] = /^(round|game|player)-(.+)$/.exec(s) || [];
+  if (kind === "round")
+    return /^[1-9]\d*$/.test(arg) ? { round: arg - 1 } : null;
+  if (kind === "game") {
+    const id = extractId(arg);
+    return id ? { game: id } : null;
+  }
+  if (kind === "player") return { player: arg.toLowerCase() };
+  return null;
+}
+
+// The fragment for a view, the other way round; "" for none.
+export function linkOf(v) {
+  if (!v) return "";
+  if (v.seeding) return "#seeding";
+  if (v.game) return `#game-${v.game}`;
+  if (v.player) return `#player-${encodeURIComponent(v.player)}`;
+  if (Number.isInteger(v.round)) return `#round-${v.round + 1}`;
+  return "";
+}
+
 // A game whose players or colours differ from its slot in the schedule:
 // "reversed", "other", or "" when it matches.
 export function scheduleMismatch(slot, g) {

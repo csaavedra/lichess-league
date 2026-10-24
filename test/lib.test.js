@@ -34,6 +34,8 @@ import {
   roundStats,
   roundState,
   currentRound,
+  parseLink,
+  linkOf,
   boardSquares,
   pieceMoves,
   gameCache,
@@ -623,6 +625,33 @@ test("extractId", () => {
   assert.equal(extractId("abc"), null);
   assert.equal(extractId("AbCd-234"), null);
   assert.equal(extractId(""), null);
+});
+
+test("parseLink and linkOf", () => {
+  assert.deepEqual(parseLink("#round-2"), { round: 1 });
+  assert.deepEqual(parseLink("#game-AbCd1234"), { game: "AbCd1234" });
+  assert.deepEqual(parseLink("#game-AbCd1234WxYz"), { game: "AbCd1234" });
+  assert.deepEqual(parseLink("#player-Alice"), { player: "alice" });
+  assert.deepEqual(parseLink("#seeding"), { seeding: true });
+  for (const h of [
+    "",
+    "#",
+    "#standings",
+    "#round-0",
+    "#round-x",
+    "#game-abc",
+    "#player-",
+    "#%E0",
+  ])
+    assert.equal(parseLink(h), null, h);
+  for (const v of [
+    { round: 1 },
+    { game: "AbCd1234" },
+    { player: "alice" },
+    { seeding: true },
+  ])
+    assert.deepEqual(parseLink(linkOf(v)), v);
+  assert.equal(linkOf(null), "");
 });
 
 test("fmtPts", () => {
