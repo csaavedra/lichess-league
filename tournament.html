@@ -443,11 +443,16 @@ const state = {
   round: null,
   lastUpdate: null,
   pausedUntil: 0,
-  open: null, // game view: { id, positions, ply, back }
-  player: null, // player view: player id
-  playerBack: false, // the player view was opened from the seeding
-  seeding: null, // seeding view: { at }, the player it was opened for, if any
+  // The view in the dialog, or null: in the shape linkOf() takes, plus what
+  // the view keeps while open.
+  //   { game: id, positions, ply, from }: from is the player view it was
+  //     opened from, if any, for the Back button
+  //   { player: id, fromSeeding }
+  //   { seeding: true, at }: at is the player it was opened for, if any
+  view: null,
 };
+// The game view, or null when the dialog shows another view or none.
+const gameView = () => (state.view?.game ? state.view : null);
 const dlg = document.getElementById("dlg"); // the one dialog, for every view
 let roundSettled = false; // until the first fetch or a click, the round shown can still move to currentRound()
 let baseLink = ""; // the fragment for the page under the dialog: a round the viewer picked, or none
@@ -930,9 +935,10 @@ function renderAll() {
   renderStandings();
   renderTabs();
   renderGames();
-  if (state.open) renderDialog();
-  else if (state.player) renderPlayer();
-  else if (state.seeding) renderSeeding();
+  const v = state.view;
+  if (v?.game) renderDialog();
+  else if (v?.player) renderPlayer();
+  else if (v?.seeding) renderSeeding();
 }
 
 // ---------- links ----------
@@ -945,15 +951,8 @@ function showDialog() {
   writeLink(opening && !fromLink);
 }
 
-function currentLink() {
-  if (state.open) return linkOf({ game: state.open.id });
-  if (state.player) return linkOf({ player: state.player });
-  if (state.seeding) return linkOf({ seeding: true });
-  return baseLink;
-}
-
 function writeLink(push) {
-  const h = currentLink();
+  const h = linkOf(state.view) || baseLink;
   const url = h || location.pathname + location.search;
   if (push) history.pushState({ dialog: true }, "", url);
   else if (h !== location.hash)
@@ -962,12 +961,13 @@ function writeLink(push) {
 }
 
 function pageTitle() {
-  const g = state.open && state.games.get(state.open.id);
+  const v = state.view;
+  const g = v?.game && state.games.get(v.game);
   const view = g
     ? `${displayName(g.white)} against ${displayName(g.black)}`
-    : state.player
-      ? nameOf(state.player)
-      : state.seeding
+    : v?.player
+      ? nameOf(v.player)
+      : v?.seeding
         ? "Seeding"
         : "";
   return view ? `${view} · ${config.title}` : config.title;
@@ -1023,12 +1023,12 @@ function buildPositions(g) {
   return list;
 }
 
-function openGame(id, back) {
+// from: the player view the game was opened from, for its Back button.
+function openGame(id, from = null) {
   const g = state.games.get(id);
   if (!g) return;
-  state.player = null;
   // renderDialog() fills in the positions and moves to the latest one.
-  state.open = { id, positions: [], ply: -1, back: back || null };
+  state.view = { game: id, positions: [], ply: -1, from };
   renderDialog();
   showDialog();
   // A closed dialog has no size, so scroll the list once it's open.
@@ -1036,21 +1036,20 @@ function openGame(id, back) {
 }
 
 function renderDialog() {
-  const { id } = state.open;
+  const o = state.view;
+  const id = o.game;
   const g = state.games.get(id);
   if (!g) return;
-  const prev = state.open.positions[state.open.ply]; // to slide in a new move
+  const prev = o.positions[o.ply]; // to slide in a new move
   // Keep up with new moves if the viewer was on the latest one.
   const fresh = buildPositions(g);
-  if (fresh.length !== state.open.positions.length) {
-    const atEnd = state.open.ply === state.open.positions.length - 1;
-    state.open.positions = fresh;
-    state.open.ply = atEnd
-      ? fresh.length - 1
-      : Math.min(state.open.ply, fresh.length - 1);
+  if (fresh.length !== o.positions.length) {
+    const atEnd = o.ply === o.positions.length - 1;
+    o.positions = fresh;
+    o.ply = atEnd ? fresh.length - 1 : Math.min(o.ply, fresh.length - 1);
   }
-  const ply = state.open.ply;
-  const cur = state.open.positions[ply];
+  const ply = o.ply;
+  const cur = o.positions[ply];
   const rName = config.rounds[roundOf(id)]?.name || "";
 
   let movesHTML = '<div class="moves" id="moves">';
@@ -1073,7 +1072,7 @@ function renderDialog() {
         <p>${esc([rName, fmtTimeControl(gameTimeControl(g)), gameDates(g)].filter(Boolean).join(" · "))}</p>
       </div>
       <div class="actions">
-        ${state.open.back ? `<button type="button" data-act="back">← ${esc(nameOf(state.open.back))}</button>` : ""}
+        ${o.from ? `<button type="button" data-act="back">← ${esc(nameOf(o.from.player))}</button>` : ""}
         <button type="button" data-act="close">Close</button>
       </div>
     </div>
@@ -1122,7 +1121,7 @@ function showMove(btn) {
 // Buttons that can't move further look disabled. aria-disabled rather than
 // disabled, so a button keeps the keyboard focus when it reaches the end.
 function updateControls() {
-  const o = state.open;
+  const o = state.view;
   const end = o.ply === o.positions.length - 1;
   for (const b of dlg.querySelectorAll(".controls button")) {
     const off =
@@ -1132,7 +1131,7 @@ function updateControls() {
 }
 
 function step(to) {
-  const o = state.open;
+  const o = gameView();
   if (!o) return;
   const ply = Math.max(0, Math.min(o.positions.length - 1, to));
   if (ply === o.ply) return;
@@ -1179,10 +1178,7 @@ const signed = (n, digits = 0) =>
   (n > 0 ? "+" : n < 0 ? "−" : "±") + Math.abs(n).toFixed(digits);
 
 function openPlayer(pid, fromSeeding = false) {
-  state.open = null;
-  state.seeding = null;
-  state.player = pid;
-  state.playerBack = fromSeeding;
+  state.view = { player: pid, fromSeeding };
   renderPlayer();
   showDialog();
   dlg.scrollTop = 0;
@@ -1320,7 +1316,7 @@ function playerGameRow({ g, round, color, me, opp, score }) {
 }
 
 function renderPlayer() {
-  const pid = state.player;
+  const { player: pid, fromSeeding } = state.view;
   const table = standings();
   const row = table.find((p) => p.id === pid);
   if (!row) return;
@@ -1340,7 +1336,7 @@ function renderPlayer() {
         <h3 id="dlg-title">${esc(displayName(row))}</h3>
         <p>${cfgP.seedRating != null ? `Seed rating ${cfgP.seedRating}${basisText(cfgP)} · ` : ""}<a href="https://lichess.org/@/${esc(row.username)}" target="_blank" rel="noopener">${esc(row.username)} on Lichess</a></p>
       </div>
-      <div class="actions">${state.playerBack ? '<button type="button" data-act="seeding">← Seeding</button>' : ""}<button type="button" data-act="close" autofocus>Close</button></div>
+      <div class="actions">${fromSeeding ? '<button type="button" data-act="seeding">← Seeding</button>' : ""}<button type="button" data-act="close" autofocus>Close</button></div>
     </div>
     <div class="tiles">${playerTiles(row, table, list, st)}</div>
     <p class="facts">${colorLine("white")} · ${colorLine("black")}</p>
@@ -1366,9 +1362,7 @@ const seedingRow = (id) =>
 // at: the player to show and highlight, when opened from their seed or
 // back from their view; from the Seed header, none.
 function openSeeding(at) {
-  state.open = null;
-  state.player = null;
-  state.seeding = { at: at || null };
+  state.view = { seeding: true, at: at || null };
   renderSeeding();
   showDialog();
   dlg.scrollTop = 0;
@@ -1395,7 +1389,7 @@ function renderSeeding() {
       const moved = p.moved
         ? ` <span class="${dir}">${icon(dir)}<span class="vh">${dir} </span>${Math.abs(p.moved)}</span>`
         : "";
-      return `<tr tabindex="0" data-player="${esc(p.id)}"${p.id === state.seeding.at ? ' class="at"' : ""}>
+      return `<tr tabindex="0" data-player="${esc(p.id)}"${p.id === state.view.at ? ' class="at"' : ""}>
       <td class="num">${p.seed}</td>
       <td class="opp">${esc(nm)}${nm !== p.username ? `<small>${esc(p.username)}</small>` : ""}</td>
       <td class="num">${p.seedRating ?? "—"}${p.seedBasis ? `<small>${esc(p.seedBasis)}</small>` : ""}</td>
@@ -1471,7 +1465,7 @@ document.addEventListener("mouseover", (e) => {
 function openRow(el) {
   const tr = el.closest("tr[data-game], tr[data-player]");
   if (!tr) return false;
-  if (tr.dataset.game) openGame(tr.dataset.game, state.player);
+  if (tr.dataset.game) openGame(tr.dataset.game, state.view);
   else openPlayer(tr.dataset.player, true);
   return true;
 }
@@ -1484,16 +1478,16 @@ dlg.addEventListener("click", (e) => {
   const b = e.target.closest("button");
   if (!b) return;
   if (b.dataset.ply) return step(+b.dataset.ply);
-  const o = state.open;
+  const o = state.view;
   switch (b.dataset.act) {
     case "close":
       dlg.close();
       break;
     case "back":
-      openPlayer(o.back, state.playerBack);
+      openPlayer(o.from.player, o.from.fromSeeding);
       break;
     case "seeding":
-      openSeeding(state.player);
+      openSeeding(o.player);
       break;
     case "first":
       step(0);
@@ -1515,7 +1509,7 @@ dlg.addEventListener("keydown", (e) => {
 });
 // Listen on the document: the dialog is re-rendered on refresh, which can drop focus out of it.
 document.addEventListener("keydown", (e) => {
-  const o = state.open;
+  const o = gameView();
   if (!o || !dlg.open || e.altKey || e.ctrlKey || e.metaKey) return;
   const to = navTarget(e.key, o.ply, Infinity);
   if (to === undefined) return;
@@ -1529,7 +1523,7 @@ let wheelAcc = 0,
 dlg.addEventListener(
   "wheel",
   (e) => {
-    const o = state.open;
+    const o = gameView();
     if (!o || e.target.closest("#moves") || e.ctrlKey) return;
     e.preventDefault();
     const now = Date.now();
@@ -1550,10 +1544,7 @@ dlg.addEventListener(
   { passive: false },
 );
 dlg.addEventListener("close", () => {
-  state.open = null;
-  state.player = null;
-  state.playerBack = false;
-  state.seeding = null;
+  state.view = null;
   // Back to the page's own entry, if the dialog has one.
   if (history.state?.dialog) history.back();
   else writeLink(false);
