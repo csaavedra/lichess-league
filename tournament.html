@@ -367,22 +367,24 @@ footer a { color: inherit; text-underline-offset: 2px; }
     </div>
   </header>
 
-  <p class="notice" id="notice" hidden></p>
+  <main>
+    <div role="status"><p class="notice" id="notice" hidden></p></div>
 
-  <section id="standings" aria-labelledby="standings-h">
-    <h2 id="standings-h">Standings</h2>
-    <div class="table-scroll"><table class="cross" id="cross"></table></div>
-    <p class="legend">Numbered columns are opponents in standings order. A green dot marks a game in progress. Ties on points are broken by TW (wins against the other players on the same points, shown only when tied), then SB (Sonneborn–Berger), then wins, then seed. Select a player's name to see their tournament performance, or a seed to see the seeding.</p>
-  </section>
+    <section id="standings" aria-labelledby="standings-h">
+      <h2 id="standings-h">Standings</h2>
+      <div class="table-scroll"><table class="cross" id="cross"></table></div>
+      <p class="legend">Numbered columns are opponents in standings order. A green dot marks a game in progress. Ties on points are broken by TW (wins against the other players on the same points, shown only when tied), then SB (Sonneborn–Berger), then wins, then seed. Select a player's name to see their tournament performance, or a seed to see the seeding.</p>
+    </section>
 
-  <section aria-labelledby="games-h">
-    <h2 id="games-h">Games</h2>
-    <div class="tabs" role="tablist" aria-labelledby="games-h" id="tabs"></div>
-    <div role="tabpanel" id="round">
-      <p class="round-meta" id="round-meta"></p>
-      <div class="games" id="games"></div>
-    </div>
-  </section>
+    <section aria-labelledby="games-h">
+      <h2 id="games-h">Games</h2>
+      <div class="tabs" role="tablist" aria-labelledby="games-h" id="tabs"></div>
+      <div role="tabpanel" id="round">
+        <p class="round-meta" id="round-meta"></p>
+        <div class="games" id="games"></div>
+      </div>
+    </section>
+  </main>
 
   <footer>This page shows positions and moves only. There is no engine or evaluation anywhere on it, by design. Game data comes from Lichess and refreshes automatically. Made with <a href="https://github.com/csaavedra/lichess-league">lichess-league</a>.</footer>
 </div>
@@ -938,6 +940,8 @@ function renderSync(msg = "") {
 function renderNotice() {
   const el = document.getElementById("notice");
   const msg = Object.values(notices).filter(Boolean).join(" ");
+  // Only when it changes: screen readers announce every change.
+  if (el.textContent === msg) return;
   el.hidden = !msg;
   el.textContent = msg;
 }
