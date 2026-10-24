@@ -314,6 +314,15 @@ export function seedingOrder(players, table) {
     }));
 }
 
+// [forename, surname], for the standings on a phone, where only the surnames
+// stay in view: the first word and the rest. That's wrong for some names
+// ("Juan Carlos Pérez"), and a single word is all surname.
+export function splitName(name) {
+  const s = String(name || "").trim();
+  const m = /^(\S+\s+)(\S.*)$/.exec(s);
+  return m ? [m[1], m[2]] : ["", s];
+}
+
 // ---------- rounds ----------
 // r: a round from parseConfig(), games: Map id -> summary. An aborted game counts as done.
 export function roundStats(r, games) {

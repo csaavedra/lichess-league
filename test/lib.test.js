@@ -36,6 +36,7 @@ import {
   currentRound,
   parseLink,
   linkOf,
+  splitName,
   boardSquares,
   pieceMoves,
   gameCache,
@@ -1173,4 +1174,12 @@ test("gameCache without a storage keeps games in memory, apart from other caches
   });
   assert.equal(a.finishedGame("Live1234"), undefined);
   assert.equal(b.finishedGame("AbCd1234"), undefined);
+});
+
+test("splitName: the first word, then the rest", () => {
+  assert.deepEqual(splitName("Ana de la Fuente"), ["Ana ", "de la Fuente"]);
+  assert.deepEqual(splitName("Juan Carlos Pérez"), ["Juan ", "Carlos Pérez"]);
+  assert.deepEqual(splitName(" Bob  Smith "), ["Bob  ", "Smith"]);
+  assert.deepEqual(splitName("alice"), ["", "alice"]);
+  assert.deepEqual(splitName(""), ["", ""]);
 });
