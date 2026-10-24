@@ -479,6 +479,24 @@ const ICONS = {
 };
 const icon = (name) =>
   `<svg viewBox="0 0 16 16" width="1em" height="1em" fill="currentColor" aria-hidden="true"><path d="${ICONS[name]}"/></svg>`;
+// Finds an element again once its container is redrawn: by the first of
+// these data attributes it has, or a link by its address.
+const FOCUS_KEYS = ["id", "game", "player", "seeding", "act", "ply"];
+function focusSelector(el) {
+  const k = FOCUS_KEYS.find((k) => k in el.dataset);
+  if (k) return `${el.localName}[data-${k}="${CSS.escape(el.dataset[k])}"]`;
+  if (el.localName === "a")
+    return `a[href="${CSS.escape(el.getAttribute("href"))}"]`;
+  return null;
+}
+// Replaces what's in el, and keeps the keyboard focus on the same thing
+// if it was in there: the page redraws on every update.
+function redraw(el, html) {
+  const a = document.activeElement;
+  const sel = el !== a && el.contains(a) ? focusSelector(a) : null;
+  el.innerHTML = html;
+  if (sel) el.querySelector(sel)?.focus({ preventScroll: true });
+}
 // The index the arrow keys, Home and End move to in a row of things.
 const navTarget = (key, cur, end) =>
   ({ ArrowLeft: cur - 1, ArrowRight: cur + 1, Home: 0, End: end })[key];
@@ -709,7 +727,7 @@ function renderStandings() {
     });
     html += `<td class="pts">${fmtPts(p.pts)}</td><td class="minor">${p.tied ? p.tiedWins : ""}</td><td class="minor">${fmtPts(p.sb)}</td><td class="minor">${p.wins}</td><td class="minor">${p.played}</td></tr>`;
   });
-  t.innerHTML = html + "</tbody>";
+  redraw(t, html + "</tbody>");
 }
 
 // A game whose players or colours differ from its slot in the schedule,
@@ -846,7 +864,7 @@ function renderGames() {
       c.dataset.fen,
     ]),
   );
-  el.innerHTML = r.slots
+  const cards = r.slots
     .map((slot) => {
       const g = slot.id && state.games.get(slot.id);
       if (!g) {
@@ -878,6 +896,7 @@ function renderGames() {
     </div>`;
     })
     .join("");
+  redraw(el, cards);
   for (const c of el.querySelectorAll(".game[data-id]")) {
     slidePieces(
       c.querySelector(".board"),
@@ -948,6 +967,13 @@ function renderAll() {
 function showDialog() {
   const opening = !dlg.open;
   if (opening) dlg.showModal();
+  // Another view in the open dialog: its first control takes the focus
+  // from the view it replaced, as showModal() would give it.
+  else if (!dlg.contains(document.activeElement))
+    (
+      dlg.querySelector("[autofocus]") ||
+      dlg.querySelector("button, [href], [tabindex='0']")
+    )?.focus();
   writeLink(opening && !fromLink);
 }
 
@@ -1065,7 +1091,9 @@ function renderDialog() {
     movesHTML += '<div class="no"></div><span class="none">No moves yet</span>';
   movesHTML += "</div>";
 
-  dlg.innerHTML = `<div class="dlg gdlg">
+  redraw(
+    dlg,
+    `<div class="dlg gdlg">
     <div class="head">
       <div>
         <h3 id="dlg-title">${esc(displayName(g.white))} against ${esc(displayName(g.black))}</h3>
@@ -1094,7 +1122,8 @@ function renderDialog() {
       ${movesHTML}
       <a href="https://lichess.org/${esc(g.id)}" target="_blank" rel="noopener">Open on Lichess</a>
     </div>
-  </div>`;
+  </div>`,
+  );
   slidePieces(dlg.querySelector("#dlg-board"), prev?.fen, cur.fen);
   showMove(dlg.querySelector(".move.cur"));
   updateControls();
@@ -1330,7 +1359,9 @@ function renderPlayer() {
       ? `<b>${fmtPts(st[c].pts)} of ${st[c].n}</b>`
       : "no finished games");
 
-  dlg.innerHTML = `<div class="dlg pdlg">
+  redraw(
+    dlg,
+    `<div class="dlg pdlg">
     <div class="head">
       <div>
         <h3 id="dlg-title">${esc(displayName(row))}</h3>
@@ -1352,7 +1383,8 @@ function renderPlayer() {
       }
     </div>
     <p class="facts fine">Ratings next to names are Lichess ratings at the start of each game. Performance and expected score use the seed ratings, each player's fixed rating for the tournament, because Lichess ratings change from game to game and can be provisional. Performance is Lichess's tournament performance over finished games: the average of each opponent's rating, plus 500 for a win and minus 500 for a loss.${config.rated ? " Rating change adds up what Lichess awarded for the finished games in this tournament." : ""}</p>
-  </div>`;
+  </div>`,
+  );
 }
 
 // ---------- seeding ----------
@@ -1374,10 +1406,6 @@ function openSeeding(at) {
 }
 
 function renderSeeding() {
-  // A refresh redraws the rows: keep the focus on the one that had it.
-  const focused = dlg.contains(document.activeElement)
-    ? document.activeElement.closest("tr[data-player]")?.dataset.player
-    : null;
   const table = standings();
   const list = seedingOrder(config.roster, table);
   // Until a game is finished the standings are only the seeds again.
@@ -1398,7 +1426,9 @@ function renderSeeding() {
     })
     .join("");
 
-  dlg.innerHTML = `<div class="dlg pdlg sdlg">
+  redraw(
+    dlg,
+    `<div class="dlg pdlg sdlg">
     <div class="head">
       <div>
         <h3 id="dlg-title">Seeding</h3>
@@ -1410,8 +1440,8 @@ function renderSeeding() {
       <thead><tr><th class="num">Seed</th><th>Player</th><th class="num">Seed rating</th>${started ? "<th>Now</th>" : ""}</tr></thead>
       <tbody>${rowsHTML}</tbody></table></div>
     <p class="facts fine">Seed ratings are each player's fixed rating for the tournament, taken from the Lichess rating named under it. Performance and expected score use them. The seed is the last tiebreak in the standings.${started ? " Now is the place in the standings, up or down from the seed." : ""}</p>
-  </div>`;
-  if (focused) seedingRow(focused)?.focus({ preventScroll: true });
+  </div>`,
+  );
 }
 
 // ---------- events ----------
