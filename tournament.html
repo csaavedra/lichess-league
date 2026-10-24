@@ -330,8 +330,15 @@ footer a { color: inherit; text-underline-offset: 2px; }
   .side { gap: 6px; }
   /* The standings scroll sideways under the ranks and the names. */
   .cross tr > :nth-child(-n + 2) { position: sticky; left: 0; background: var(--surface); }
-  .cross tr > :first-child { min-width: 36px; }
-  .cross tr > :nth-child(2) { left: 36px; box-shadow: inset -1px 0 var(--line); }
+  .cross tr > :first-child { min-width: 36px; z-index: 1; }
+  /* Each surname and the line under it stop next to the ranks once the
+     forename has gone under them, and the names stop when only those are
+     left. A button only takes the width of its text, so the name's fills
+     the cell to give them room to move. */
+  .cross tr > :nth-child(2) { left: var(--name-left, 36px); box-shadow: inset -1px 0 var(--line); }
+  .cross .pname { width: 100%; min-width: var(--name-w); }
+  .cross :is(.sn, th.name span) { display: inline-block; position: sticky; left: 36px; }
+  .cross td.name small { width: fit-content; position: sticky; left: 36px; }
 }
 /* Phones: the cards give the rating's room to the name. The game dialog
    still shows it. Wider windows have room for both. */
@@ -413,6 +420,7 @@ import {
   pieceMoves,
   computeStandings,
   seedingOrder,
+  splitName,
   scheduleMismatch,
   ratedMismatch,
   playerGames,
@@ -708,7 +716,7 @@ function renderStandings() {
   const seeded = rows.some((p) => seedOf(p.id) != null);
   const seedBtn = (label, id) =>
     `<button type="button" class="seedbtn" data-seeding="${esc(id || "")}"${id ? ' tabindex="-1"' : ""} title="Show the seeding">${label}</button>`;
-  let html = `<thead><tr><th>#</th><th class="name">Player</th><th>${seeded ? seedBtn("Seed") : "Seed"}</th>`;
+  let html = `<thead><tr><th>#</th><th class="name"><span>Player</span></th><th>${seeded ? seedBtn("Seed") : "Seed"}</th>`;
   // Opponents by number, named for screen readers.
   rows.forEach((o, i) => {
     html += `<th aria-label="${esc(displayName(o))}">${i + 1}</th>`;
@@ -717,6 +725,7 @@ function renderStandings() {
     '<th>Pts</th><th title="Wins against the players tied on points">TW</th><th title="Sonneborn–Berger">SB</th><th>Wins</th><th>Played</th></tr></thead><tbody>';
   rows.forEach((p) => {
     const nm = displayName(p);
+    const [fn, sn] = splitName(nm);
     const cfgP = config.roster.get(p.id);
     const seed = seedOf(p.id);
     const rating =
@@ -728,7 +737,7 @@ function renderStandings() {
       user || rating
         ? `<small>${[user, rating].filter(Boolean).join(" · ")}</small>`
         : "";
-    html += `<tr><td class="rank">${p.rank}</td><td class="name"><button type="button" class="pname" data-player="${esc(p.id)}" aria-label="${esc(nm)}, show performance"><strong>${esc(nm)}</strong>${sub}</button></td><td class="minor">${seed != null ? seedBtn(seed, p.id) : ""}</td>`;
+    html += `<tr><td class="rank">${p.rank}</td><td class="name"><button type="button" class="pname" data-player="${esc(p.id)}" aria-label="${esc(nm)}, show performance"><strong><span class="fn">${esc(fn)}</span><span class="sn">${esc(sn)}</span></strong>${sub}</button></td><td class="minor">${seed != null ? seedBtn(seed, p.id) : ""}</td>`;
     rows.forEach((o) => {
       if (o.id === p.id) {
         html += '<td class="res self"></td>';
@@ -745,6 +754,23 @@ function renderStandings() {
     html += `<td class="pts">${fmtPts(p.pts)}</td><td class="minor">${p.tied ? p.tiedWins : ""}</td><td class="minor">${fmtPts(p.sb)}</td><td class="minor">${p.wins}</td><td class="minor">${p.played}</td></tr>`;
   });
   redraw(t, html + "</tbody>");
+  stickSurnames();
+}
+
+// Where the names column stops: when only the widest surname, or line under
+// a name, is left next to the ranks. It's at least that wide past the longest
+// forename, so every forename is gone by then.
+function stickSurnames() {
+  const t = document.getElementById("cross");
+  const td = t.querySelector("tbody td.name");
+  if (!td) return;
+  const widest = (sel) =>
+    Math.max(...[...t.querySelectorAll(sel)].map((e) => e.offsetWidth));
+  const shown = widest("tbody :is(.sn, td.name small)");
+  t.style.setProperty("--name-w", `${widest("tbody .fn") + shown}px`);
+  const end = td.offsetWidth - parseFloat(getComputedStyle(td).paddingRight);
+  const rank = t.querySelector("tbody td.rank").offsetWidth;
+  t.style.setProperty("--name-left", `${rank + shown - end}px`);
 }
 
 // A game whose players or colours differ from its slot in the schedule,
@@ -1490,6 +1516,9 @@ document.getElementById("tabs").addEventListener("keydown", (e) => {
   e.preventDefault();
   selectRound((to + n) % n);
 });
+// The names' widths change once the fonts have loaded, and with the window's.
+document.fonts.ready.then(stickSurnames);
+addEventListener("resize", stickSurnames);
 // A click anywhere in a cell with one result or seed is a click on it:
 // the buttons are small to hit on a phone.
 document.getElementById("cross").addEventListener("click", (e) => {
