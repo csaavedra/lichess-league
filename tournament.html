@@ -257,7 +257,7 @@ dialog::backdrop { background: rgba(10, 14, 12, 0.6); }
 .moves .no { color: var(--muted); padding: 5px 8px; background: var(--bg); font-size: 14px; }
 .move { padding: 5px 10px; cursor: pointer; border: 0; background: none; text-align: left; font: 500 15px/1.4 "Lichess Figurines", var(--font-text); color: var(--ink); border-radius: 0; }
 .move:hover { background: var(--self); color: var(--ink); }
-.move.cur { background: var(--accent-soft); font-weight: 700; }
+.move[aria-current] { background: var(--accent-soft); font-weight: 700; }
 .dlg .side-panel { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .dlg .opening { font-size: 14px; color: var(--muted); }
 .dlg a { color: var(--accent); font-weight: 600; }
@@ -1079,7 +1079,7 @@ function openGame(id, from = null) {
   renderDialog();
   showDialog();
   // A closed dialog has no size, so scroll the list once it's open.
-  showMove(dlg.querySelector(".move.cur"));
+  showMove(dlg.querySelector(".move[aria-current]"));
 }
 
 function renderDialog() {
@@ -1104,7 +1104,7 @@ function renderDialog() {
     movesHTML += `<div class="no">${i / 2 + 1}.</div>`;
     for (const j of [i, i + 1]) {
       if (j < g.moves.length)
-        movesHTML += `<button type="button" class="move${ply === j + 1 ? " cur" : ""}" data-ply="${j + 1}">${esc(g.moves[j])}</button>`;
+        movesHTML += `<button type="button" class="move"${ply === j + 1 ? ' aria-current="true"' : ""} data-ply="${j + 1}">${esc(g.moves[j])}</button>`;
       else movesHTML += "<span></span>";
     }
   }
@@ -1146,7 +1146,7 @@ function renderDialog() {
   </div>`,
   );
   slidePieces(dlg.querySelector("#dlg-board"), prev?.fen, cur.fen);
-  showMove(dlg.querySelector(".move.cur"));
+  showMove(dlg.querySelector(".move[aria-current]"));
   updateControls();
 }
 
@@ -1191,10 +1191,10 @@ function step(to) {
   const board = dlg.querySelector("#dlg-board");
   board.innerHTML = boardHTML(cur.fen, cur.last, true);
   slidePieces(board, prev.fen, cur.fen);
-  dlg.querySelectorAll(".move.cur").forEach((b) => b.classList.remove("cur"));
+  dlg.querySelector(".move[aria-current]")?.removeAttribute("aria-current");
   const btn = dlg.querySelector(`.move[data-ply="${ply}"]`);
   if (btn) {
-    btn.classList.add("cur");
+    btn.setAttribute("aria-current", "true");
     showMove(btn);
   } else {
     const list = dlg.querySelector("#moves");
