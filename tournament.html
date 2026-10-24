@@ -226,6 +226,7 @@ table.cross { border-collapse: collapse; width: 100%; font-variant-numeric: tabu
 dialog {
   border: 1px solid var(--line); border-radius: calc(var(--radius) + 2px); padding: 0; background: var(--surface); color: var(--ink);
   width: min(960px, 96vw); max-height: 94vh;
+  overscroll-behavior: contain; /* the page behind doesn't scroll */
 }
 dialog::backdrop { background: rgba(10, 14, 12, 0.6); }
 .dlg { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 24px; padding: 22px; }
@@ -1117,7 +1118,7 @@ function renderDialog() {
         <button type="button" data-act="next" aria-label="Next move">${icon("next")}</button>
         <button type="button" data-act="last" aria-label="Latest position">${icon("last")}</button>
       </div>
-      <p class="keys">← → or mouse wheel to step through moves, Home and End for the start and latest position.</p>
+      <p class="keys">← → or the mouse wheel over the board to step through moves, Home and End for the start and latest position.</p>
     </div>
     <div class="side-panel">
       <div class="status">${statusText(g)}</div>
@@ -1549,15 +1550,29 @@ document.addEventListener("keydown", (e) => {
   e.preventDefault();
   step(to);
 });
-// Wheel anywhere in the dialog except the move list, which scrolls normally.
-// Deltas are accumulated so a touchpad doesn't race through the game.
+// Over the backdrop the wheel would scroll the page behind. The backdrop is
+// the dialog for events, as is its scrollbar, but outside its box, where the
+// browser doesn't wait for the dialog's listeners: only one on the whole
+// window works.
+addEventListener(
+  "wheel",
+  (e) => {
+    if (e.target !== dlg) return;
+    const { left, right, top, bottom } = dlg.getBoundingClientRect();
+    const { clientX: x, clientY: y } = e;
+    if (x < left || x > right || y < top || y > bottom) e.preventDefault();
+  },
+  { passive: false },
+);
+// The wheel over the board steps through the moves; anywhere else it
+// scrolls. Deltas are accumulated so a touchpad doesn't race through the game.
 let wheelAcc = 0,
   wheelAt = 0;
 dlg.addEventListener(
   "wheel",
   (e) => {
     const o = gameView();
-    if (!o || e.target.closest("#moves") || e.ctrlKey) return;
+    if (!o || !e.target.closest("#dlg-board") || e.ctrlKey) return;
     e.preventDefault();
     const now = Date.now();
     if (now - wheelAt > 300) wheelAcc = 0;
