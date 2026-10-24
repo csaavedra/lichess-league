@@ -98,7 +98,9 @@ section { margin-bottom: 40px; }
 
 /* Crosstable */
 .table-scroll { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
-table.cross { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+/* Separate borders, so that a cell's background also covers its border:
+   on a phone the ranks and names stay put over the cells scrolling under. */
+table.cross { border-collapse: separate; border-spacing: 0; width: 100%; font-variant-numeric: tabular-nums; }
 .cross th, .cross td { padding: 10px 8px; text-align: center; border-bottom: 1px solid var(--line); white-space: nowrap; }
 .cross tr:last-child td { border-bottom: 0; }
 .cross thead th { font-size: 13px; font-weight: 600; color: var(--muted); }
@@ -319,6 +321,10 @@ footer a { color: inherit; text-underline-offset: 2px; }
   .games { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
   .game { padding: 10px; }
   .side { gap: 6px; }
+  /* The standings scroll sideways under the ranks and the names. */
+  .cross tr > :nth-child(-n + 2) { position: sticky; left: 0; background: var(--surface); }
+  .cross tr > :first-child { min-width: 36px; }
+  .cross tr > :nth-child(2) { left: 36px; box-shadow: inset -1px 0 var(--line); }
 }
 /* Phones: the cards give the rating's room to the name. The game dialog
    still shows it. Wider windows have room for both. */
