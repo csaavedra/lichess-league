@@ -1337,18 +1337,21 @@ function toPlayItems(pid) {
 
 // One row of the player view's games table, from playerGames().
 function playerGameRow({ g, round, color, me, opp, score }) {
-  let res, note;
+  let res, note, words;
   if (g.result === "void") {
     res = "—";
     note = "Aborted, does not count";
+    words = "aborted";
   } else if (score === null) {
     res = '<span class="live">● live</span>';
+    words = "in progress";
     const left = leftHTML(g);
     note = !g.moves.length
       ? "Not started"
       : `${esc(displayName(g.turn === color ? me : opp))} to move, ${left ? `${left}, ` : ""}last move ${ago(g.lastMoveAt)}`;
   } else {
     res = `<span class="${KINDS[score]}">${fmtPts(score)}</span>`;
+    words = CELL[KINDS[score]][1];
     note = `${reason(g)}${g.opening ? ", " + esc(g.opening) : ""}`;
     note = note[0].toUpperCase() + note.slice(1);
   }
@@ -1356,7 +1359,8 @@ function playerGameRow({ g, round, color, me, opp, score }) {
     me.ratingDiff != null
       ? `<span class="${trend(me.ratingDiff)}">${signed(me.ratingDiff)}</span>`
       : "";
-  return `<tr tabindex="0" data-game="${esc(g.id)}">
+  // A focused row reads as its name, not as every cell in it.
+  return `<tr tabindex="0" data-game="${esc(g.id)}" aria-label="${esc(`${round}, against ${displayName(opp)}, ${words}, open game`)}">
     <td>${esc(round)}</td>
     <td class="opp"><span class="chip ${color[0]}" title="Played with ${color}"></span>${esc(displayName(opp))}${ratingHTML(opp)}</td>
     <td class="r">${res}</td>
@@ -1439,7 +1443,7 @@ function renderSeeding() {
       const moved = p.moved
         ? ` <span class="${dir}">${icon(dir)}<span class="vh">${dir} </span>${Math.abs(p.moved)}</span>`
         : "";
-      return `<tr tabindex="0" data-player="${esc(p.id)}"${p.id === state.view.at ? ' class="at"' : ""}>
+      return `<tr tabindex="0" data-player="${esc(p.id)}" aria-label="${esc(`Seed ${p.seed}, ${nm}, show performance`)}"${p.id === state.view.at ? ' class="at"' : ""}>
       <td class="num">${p.seed}</td>
       <td class="opp">${esc(nm)}${nm !== p.username ? `<small>${esc(p.username)}</small>` : ""}</td>
       <td class="num">${p.seedRating ?? "—"}${p.seedBasis ? `<small>${esc(p.seedBasis)}</small>` : ""}</td>
