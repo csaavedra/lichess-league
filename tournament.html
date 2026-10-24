@@ -118,6 +118,10 @@ table.cross { border-collapse: separate; border-spacing: 0; width: 100%; font-va
 .cross tbody tr:first-child td.pts { color: var(--accent); }
 .cross :is(.pname, .seedbtn, .resbtn) { all: unset; cursor: pointer; border-radius: 3px; }
 .cross .pname { display: block; }
+.cross td:has(> button:only-child) { cursor: pointer; }
+/* No tap highlight: on a phone it covers the whole cell and can stay on
+   behind the view the tap opens. */
+.cross { -webkit-tap-highlight-color: transparent; }
 .cross :is(.pname:hover strong, .seedbtn:hover, .resbtn:hover span) { text-decoration: underline; text-underline-offset: 3px; }
 .legend { color: var(--muted); font-size: 13px; margin: 8px 2px 0; }
 
@@ -1474,8 +1478,12 @@ document.getElementById("tabs").addEventListener("keydown", (e) => {
   e.preventDefault();
   selectRound((to + n) % n);
 });
+// A click anywhere in a cell with one result or seed is a click on it:
+// the buttons are small to hit on a phone.
 document.getElementById("cross").addEventListener("click", (e) => {
-  const b = e.target.closest("button");
+  const b =
+    e.target.closest("button") ||
+    e.target.closest("td")?.querySelector(":scope > button:only-child");
   if (!b) return;
   const { game, player, seeding } = b.dataset;
   if (game) openGame(game);
