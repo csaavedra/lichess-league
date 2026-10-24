@@ -709,8 +709,9 @@ function renderStandings() {
   const seedBtn = (label, id) =>
     `<button type="button" class="seedbtn" data-seeding="${esc(id || "")}"${id ? ' tabindex="-1"' : ""} title="Show the seeding">${label}</button>`;
   let html = `<thead><tr><th>#</th><th class="name">Player</th><th>${seeded ? seedBtn("Seed") : "Seed"}</th>`;
-  rows.forEach((_, i) => {
-    html += `<th>${i + 1}</th>`;
+  // Opponents by number, named for screen readers.
+  rows.forEach((o, i) => {
+    html += `<th aria-label="${esc(displayName(o))}">${i + 1}</th>`;
   });
   html +=
     '<th>Pts</th><th title="Wins against the players tied on points">TW</th><th title="Sonneborn–Berger">SB</th><th>Wins</th><th>Played</th></tr></thead><tbody>';
