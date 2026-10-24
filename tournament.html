@@ -1203,41 +1203,18 @@ function tile(k, v, s, cls) {
   return `<div class="tile"><div class="k">${k}</div><div class="v${cls ? " " + cls : ""}">${v}</div><div class="s">${s}</div></div>`;
 }
 
-function renderPlayer() {
-  const pid = state.player;
-  const table = standings();
-  const row = table.find((p) => p.id === pid);
-  if (!row) return;
-  const list = playerGames(pid, config.rounds, state.games);
-  const st = playerStats(list, config.roster, config.scoring);
-  const nm = displayName(row);
+// The tiles at the top of the player view. row: the player's standings
+// row, table: the standings, list and st: playerGames() and playerStats().
+function playerTiles(row, table, list, st) {
+  const seed = seedOf(row.id);
+  const moved = seed != null ? seed - row.rank : 0;
+  const now = `now ${ordinal(row.rank)}`;
+  const pct = st.n ? Math.round((st.frac / st.n) * 100) : null;
   const firstGame = [...list].sort(
     (a, b) => (a.g.createdAt || 0) - (b.g.createdAt || 0),
   )[0];
   const startRating = firstGame?.me.rating ?? null;
-  const toPlay = config.rounds.flatMap((r) =>
-    r.slots
-      .filter((x) => !x.id && (x.white === pid || x.black === pid))
-      .map((x) => {
-        const color = x.white === pid ? "white" : "black";
-        const opp = x.white === pid ? x.black : x.white;
-        const link =
-          color === "white" && !x.raw ? challengeLink(x, "challenge") : "";
-        return `<li><span class="chip ${color[0]}" title="With ${color}"></span>${esc(r.name)} · <b>${esc(nameOf(opp))}</b>${link ? ` · ${link}` : ""}</li>`;
-      }),
-  );
-  const cfgP = config.roster.get(pid) || {};
-  const seed = cfgP.seed ?? null;
-  const moved = seed != null ? seed - row.rank : 0;
-  const pct = st.n ? Math.round((st.frac / st.n) * 100) : null;
-  const colorLine = (c) =>
-    `With ${c}: ` +
-    (st[c].n
-      ? `<b>${fmtPts(st[c].pts)} of ${st[c].n}</b>`
-      : "no finished games");
-  const now = `now ${ordinal(row.rank)}`;
-
-  const tiles = [
+  return [
     tile(
       "Rank",
       `${row.rank}<small>/${table.length}</small>`,
@@ -1293,48 +1270,79 @@ function renderPlayer() {
         : "",
     ),
   ].join("");
+}
 
-  const rowsHTML = list
-    .map(({ g, round, color, me, opp, score }) => {
-      let res, note;
-      if (g.result === "void") {
-        res = "—";
-        note = "Aborted, does not count";
-      } else if (score === null) {
-        res = '<span class="live">● live</span>';
-        const left = leftHTML(g);
-        note = !g.moves.length
-          ? "Not started"
-          : `${esc(displayName(g.turn === color ? me : opp))} to move, ${left ? `${left}, ` : ""}last move ${ago(g.lastMoveAt)}`;
-      } else {
-        res = `<span class="${KINDS[score]}">${fmtPts(score)}</span>`;
-        note = `${reason(g)}${g.opening ? ", " + esc(g.opening) : ""}`;
-        note = note[0].toUpperCase() + note.slice(1);
-      }
-      const diff =
-        me.ratingDiff != null
-          ? `<span class="${trend(me.ratingDiff)}">${signed(me.ratingDiff)}</span>`
-          : "";
-      return `<tr tabindex="0" data-game="${esc(g.id)}">
-      <td>${esc(round)}</td>
-      <td class="opp"><span class="chip ${color[0]}" title="Played with ${color}"></span>${esc(displayName(opp))}${ratingHTML(opp)}</td>
-      <td class="r">${res}</td>
-      <td class="num">${diff}</td>
-      <td class="num">${moveCount(g)}</td>
-      <td class="note">${note}</td>
-    </tr>`;
-    })
-    .join("");
+// The scheduled games of a player that aren't on Lichess yet, as list items,
+// with a challenge link for the ones they play with white.
+function toPlayItems(pid) {
+  return config.rounds.flatMap((r) =>
+    r.slots
+      .filter((x) => !x.id && (x.white === pid || x.black === pid))
+      .map((x) => {
+        const color = x.white === pid ? "white" : "black";
+        const opp = x.white === pid ? x.black : x.white;
+        const link =
+          color === "white" && !x.raw ? challengeLink(x, "challenge") : "";
+        return `<li><span class="chip ${color[0]}" title="With ${color}"></span>${esc(r.name)} · <b>${esc(nameOf(opp))}</b>${link ? ` · ${link}` : ""}</li>`;
+      }),
+  );
+}
+
+// One row of the player view's games table, from playerGames().
+function playerGameRow({ g, round, color, me, opp, score }) {
+  let res, note;
+  if (g.result === "void") {
+    res = "—";
+    note = "Aborted, does not count";
+  } else if (score === null) {
+    res = '<span class="live">● live</span>';
+    const left = leftHTML(g);
+    note = !g.moves.length
+      ? "Not started"
+      : `${esc(displayName(g.turn === color ? me : opp))} to move, ${left ? `${left}, ` : ""}last move ${ago(g.lastMoveAt)}`;
+  } else {
+    res = `<span class="${KINDS[score]}">${fmtPts(score)}</span>`;
+    note = `${reason(g)}${g.opening ? ", " + esc(g.opening) : ""}`;
+    note = note[0].toUpperCase() + note.slice(1);
+  }
+  const diff =
+    me.ratingDiff != null
+      ? `<span class="${trend(me.ratingDiff)}">${signed(me.ratingDiff)}</span>`
+      : "";
+  return `<tr tabindex="0" data-game="${esc(g.id)}">
+    <td>${esc(round)}</td>
+    <td class="opp"><span class="chip ${color[0]}" title="Played with ${color}"></span>${esc(displayName(opp))}${ratingHTML(opp)}</td>
+    <td class="r">${res}</td>
+    <td class="num">${diff}</td>
+    <td class="num">${moveCount(g)}</td>
+    <td class="note">${note}</td>
+  </tr>`;
+}
+
+function renderPlayer() {
+  const pid = state.player;
+  const table = standings();
+  const row = table.find((p) => p.id === pid);
+  if (!row) return;
+  const list = playerGames(pid, config.rounds, state.games);
+  const st = playerStats(list, config.roster, config.scoring);
+  const toPlay = toPlayItems(pid);
+  const cfgP = config.roster.get(pid) || {};
+  const colorLine = (c) =>
+    `With ${c}: ` +
+    (st[c].n
+      ? `<b>${fmtPts(st[c].pts)} of ${st[c].n}</b>`
+      : "no finished games");
 
   dlg.innerHTML = `<div class="dlg pdlg">
     <div class="head">
       <div>
-        <h3 id="dlg-title">${esc(nm)}</h3>
+        <h3 id="dlg-title">${esc(displayName(row))}</h3>
         <p>${cfgP.seedRating != null ? `Seed rating ${cfgP.seedRating}${basisText(cfgP)} · ` : ""}<a href="https://lichess.org/@/${esc(row.username)}" target="_blank" rel="noopener">${esc(row.username)} on Lichess</a></p>
       </div>
       <div class="actions">${state.playerBack ? '<button type="button" data-act="seeding">← Seeding</button>' : ""}<button type="button" data-act="close" autofocus>Close</button></div>
     </div>
-    <div class="tiles">${tiles}</div>
+    <div class="tiles">${playerTiles(row, table, list, st)}</div>
     <p class="facts">${colorLine("white")} · ${colorLine("black")}</p>
     ${toPlay.length ? `<div><h4>Still to play</h4><ul class="upcoming">${toPlay.join("")}</ul></div>` : list.length ? '<p class="facts">Has played every opponent.</p>' : ""}
     <div>
@@ -1343,7 +1351,7 @@ function renderPlayer() {
         list.length
           ? `<div class="table-scroll"><table class="pgames">
         <thead><tr><th>Round</th><th>Opponent</th><th class="r">Result</th><th class="num">Rating</th><th class="num">Moves</th><th>Notes</th></tr></thead>
-        <tbody>${rowsHTML}</tbody></table></div>`
+        <tbody>${list.map(playerGameRow).join("")}</tbody></table></div>`
           : '<p class="facts">No games yet.</p>'
       }
     </div>
